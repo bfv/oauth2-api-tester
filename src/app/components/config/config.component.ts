@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { ConfigService } from '../../services/config.service';
 import { AuthService } from '../../services/auth.service';
-import { KeycloakConfig, ApiConfig } from '../../models/config.model';
+import { KeycloakConfig, EntraConfig, ApiConfig, OAuthProvider } from '../../models/config.model';
 
 @Component({
   selector: 'app-config',
@@ -14,53 +14,140 @@ import { KeycloakConfig, ApiConfig } from '../../models/config.model';
       <h2>Configuration</h2>
       
       <div class="config-section">
-        <h3>Keycloak Configuration</h3>
-        <form (ngSubmit)="saveKeycloakConfig()" #kcForm="ngForm">
-          <div class="form-group">
-            <label for="issuer">Issuer URL:</label>
-            <input 
-              type="text" 
-              id="issuer" 
-              name="issuer"
-              [(ngModel)]="keycloakConfig.issuer" 
-              placeholder="http://localhost:8080/realms/master"
-              required>
+        <h3>OAuth Configuration</h3>
+        
+        <!-- Provider Selection -->
+        <div class="form-group">
+          <label>OAuth Provider:</label>
+          <div class="radio-group">
+            <label class="radio-label">
+              <input type="radio" [(ngModel)]="selectedProvider" value="keycloak" name="provider" (change)="onProviderChange()">
+              Keycloak
+            </label>
+            <label class="radio-label disabled">
+              <input type="radio" [(ngModel)]="selectedProvider" value="entra" name="provider" (change)="onProviderChange()" disabled>
+              Microsoft Entra ID
+              <small class="disabled-note">(Temporarily disabled - awaiting configuration access)</small>
+            </label>
           </div>
-          
-          <div class="form-group">
-            <label for="clientId">Client ID:</label>
-            <input 
-              type="text" 
-              id="clientId" 
-              name="clientId"
-              [(ngModel)]="keycloakConfig.clientId" 
-              placeholder="jwt-client"
-              required>
-          </div>
-          
-          <div class="form-group">
-            <label for="redirectUri">Redirect URI:</label>
-            <input 
-              type="text" 
-              id="redirectUri" 
-              name="redirectUri"
-              [(ngModel)]="keycloakConfig.redirectUri" 
-              [placeholder]="currentOrigin">
-          </div>
-          
-          <div class="form-group">
-            <label for="scope">Scope:</label>
-            <input 
-              type="text" 
-              id="scope" 
-              name="scope"
-              [(ngModel)]="keycloakConfig.scope" 
-              placeholder="openid profile email">
-          </div>
-          
-          <button type="submit" [disabled]="!kcForm.form.valid" class="btn btn-primary">
-            Save Keycloak Config
-          </button>
+        </div>
+
+        <!-- Keycloak Configuration -->
+        <div *ngIf="selectedProvider === 'keycloak'">
+          <form (ngSubmit)="saveOAuthConfig()" #kcForm="ngForm">
+            <div class="form-group">
+              <label for="issuer">Issuer URL:</label>
+              <input 
+                type="text" 
+                id="issuer" 
+                name="issuer"
+                [(ngModel)]="keycloakConfig.issuer" 
+                placeholder="https://keycloak.example.com/realms/master"
+                required>
+            </div>
+            
+            <div class="form-group">
+              <label for="clientId">Client ID:</label>
+              <input 
+                type="text" 
+                id="clientId" 
+                name="clientId"
+                [(ngModel)]="keycloakConfig.clientId" 
+                placeholder="jwt-client"
+                required>
+            </div>
+            
+            <div class="form-group">
+              <label for="redirectUri">Redirect URI:</label>
+              <input 
+                type="text" 
+                id="redirectUri" 
+                name="redirectUri"
+                [(ngModel)]="keycloakConfig.redirectUri" 
+                [placeholder]="currentOrigin">
+              <small class="help-text">
+                🔧 <strong>Custom Redirect URI Support:</strong> You can use custom redirect URIs like <code>http://localhost:18820</code>. 
+                To use a custom redirect URI, serve the <code>oauth-redirect.html</code> file from the project root at your custom URL.
+                <br>Example: Copy <code>oauth-redirect.html</code> to your custom server and update the <code>MAIN_APP_URL</code> constant.
+              </small>
+            </div>
+            
+            <div class="form-group">
+              <label for="scope">Scope:</label>
+              <input 
+                type="text" 
+                id="scope" 
+                name="scope"
+                [(ngModel)]="keycloakConfig.scope" 
+                placeholder="openid profile email">
+            </div>
+            
+            <button type="submit" [disabled]="!kcForm.form.valid" class="btn btn-primary">
+              Save OAuth Config
+            </button>
+          </form>
+        </div>
+
+        <!-- Entra Configuration -->
+        <div *ngIf="selectedProvider === 'entra'">
+          <form (ngSubmit)="saveOAuthConfig()" #entraForm="ngForm">
+            <div class="form-group">
+              <label for="tenantId">Tenant ID:</label>
+              <input 
+                type="text" 
+                id="tenantId" 
+                name="tenantId"
+                [(ngModel)]="entraConfig.tenantId" 
+                placeholder="common (or your specific tenant ID)"
+                required>
+              <small class="help-text">Use 'common' for multi-tenant, 'organizations' for work accounts, or your specific tenant ID</small>
+            </div>
+            
+            <div class="form-group">
+              <label for="entraClientId">Client ID:</label>
+              <input 
+                type="text" 
+                id="entraClientId" 
+                name="entraClientId"
+                [(ngModel)]="entraConfig.clientId" 
+                placeholder="Application (client) ID from Azure Portal"
+                required>
+            </div>
+            
+            <div class="form-group">
+              <label for="entraRedirectUri">Redirect URI:</label>
+              <input 
+                type="text" 
+                id="entraRedirectUri" 
+                name="entraRedirectUri"
+                [(ngModel)]="entraConfig.redirectUri" 
+                [placeholder]="currentOrigin">
+              <small class="help-text">
+                🔧 <strong>Custom Redirect URI Support:</strong> You can use custom redirect URIs like <code>https://localhost:18820</code>. 
+                To use a custom redirect URI, serve the <code>oauth-redirect.html</code> file from the project root at your custom URL.
+                <br>Example: Copy <code>oauth-redirect.html</code> to your custom server and update the <code>MAIN_APP_URL</code> constant.
+              </small>
+            </div>
+            
+            <div class="form-group">
+              <label for="entraScope">Scope:</label>
+              <input 
+                type="text" 
+                id="entraScope" 
+                name="entraScope"
+                [(ngModel)]="entraConfig.scope" 
+                placeholder="openid profile email User.Read">
+              <small class="help-text">Common scopes: openid, profile, email, User.Read, offline_access</small>
+            </div>
+            
+            <button type="submit" [disabled]="!entraForm.form.valid" class="btn btn-primary">
+              Save OAuth Config
+            </button>
+          </form>
+        </div>
+
+        <!-- Common Export/Import buttons -->
+        <div class="export-import-section">
           <button type="button" (click)="exportKeycloakConfig()" class="btn btn-secondary">
             Export Config
           </button>
@@ -71,7 +158,7 @@ import { KeycloakConfig, ApiConfig } from '../../models/config.model';
           <div class="help-text">
             <small>💡 Export creates a JSON file with your configuration. Import automatically loads and saves the configuration locally. Modern browsers (Chrome/Edge) will show a save dialog for export, others will prompt for filename.</small>
           </div>
-        </form>
+        </div>
       </div>
       
       <div class="config-section">
@@ -224,6 +311,46 @@ import { KeycloakConfig, ApiConfig } from '../../models/config.model';
       font-style: italic;
     }
     
+    .radio-group {
+      display: flex;
+      gap: 20px;
+      margin-top: 5px;
+    }
+    
+    .radio-label {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+      font-weight: normal;
+    }
+    
+    .radio-label input[type="radio"] {
+      margin: 0;
+    }
+    
+    .radio-label.disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .radio-label.disabled input[type="radio"] {
+      cursor: not-allowed;
+    }
+    
+    .disabled-note {
+      color: #6c757d;
+      font-style: italic;
+      font-size: 0.8em;
+      margin-left: 5px;
+    }
+    
+    .export-import-section {
+      margin-top: 20px;
+      padding-top: 15px;
+      border-top: 1px solid #ddd;
+    }
+    
     .message {
       padding: 10px;
       border-radius: 3px;
@@ -245,7 +372,9 @@ import { KeycloakConfig, ApiConfig } from '../../models/config.model';
 })
 export class ConfigComponent {
   keycloakConfig!: KeycloakConfig;
+  entraConfig!: EntraConfig;
   apiConfig!: ApiConfig;
+  selectedProvider: OAuthProvider = 'keycloak';
   endpointEntries: Array<{id: number, name: string, path: string}> = [];
   currentOrigin = window.location.origin;
   private nextId = 1;
@@ -263,7 +392,22 @@ export class ConfigComponent {
   private loadCurrentConfig(): void {
     const savedConfig = this.configService.getConfig();
     
-    this.keycloakConfig = savedConfig?.keycloak || this.configService.getDefaultKeycloakConfig();
+    // Load current provider - force Keycloak since Entra is temporarily disabled
+    const savedProvider = this.configService.getCurrentProvider();
+    this.selectedProvider = savedProvider === 'entra' ? 'keycloak' : savedProvider;
+    
+    // If the saved config was Entra, switch to Keycloak and save the change
+    if (savedProvider === 'entra') {
+      this.configService.saveOAuthConfig({
+        provider: 'keycloak',
+        keycloak: this.configService.getKeycloakConfig() || this.configService.getDefaultKeycloakConfig(),
+        entra: this.configService.getEntraConfig() || this.configService.getDefaultEntraConfig()
+      });
+    }
+    
+    // Load configurations
+    this.keycloakConfig = this.configService.getKeycloakConfig() || this.configService.getDefaultKeycloakConfig();
+    this.entraConfig = this.configService.getEntraConfig() || this.configService.getDefaultEntraConfig();
     this.apiConfig = savedConfig?.api || this.configService.getDefaultApiConfig();
     
     this.updateEndpointEntries();
@@ -282,9 +426,30 @@ export class ConfigComponent {
     }
   }
 
+  onProviderChange(): void {
+    // Prevent switching to Entra ID (temporarily disabled)
+    if (this.selectedProvider === 'entra') {
+      this.selectedProvider = 'keycloak';
+      this.showMessage('Entra ID is temporarily disabled - awaiting configuration access', 'error');
+      return;
+    }
+    
+    console.log('OAuth provider changed to:', this.selectedProvider);
+  }
+
+  saveOAuthConfig(): void {
+    if (this.selectedProvider === 'keycloak') {
+      this.configService.saveKeycloakConfig(this.keycloakConfig);
+      // Note: AuthService will need to be updated to handle the new config structure
+      this.showMessage('Keycloak configuration saved successfully!', 'success');
+    } else if (this.selectedProvider === 'entra') {
+      this.configService.saveEntraConfig(this.entraConfig);
+      this.showMessage('Microsoft Entra configuration saved successfully!', 'success');
+    }
+  }
+
   saveKeycloakConfig(): void {
     this.configService.saveKeycloakConfig(this.keycloakConfig);
-    this.authService.configureAuth(this.keycloakConfig);
     this.showMessage('Keycloak configuration saved successfully!', 'success');
   }
 
@@ -319,7 +484,9 @@ export class ConfigComponent {
 
   loadDefaults(): void {
     this.keycloakConfig = this.configService.getDefaultKeycloakConfig();
+    this.entraConfig = this.configService.getDefaultEntraConfig();
     this.apiConfig = this.configService.getDefaultApiConfig();
+    this.selectedProvider = 'keycloak'; // Reset to default provider
     this.updateEndpointEntries();
     this.showMessage('Default configuration loaded', 'success');
   }
@@ -332,16 +499,23 @@ export class ConfigComponent {
 
   exportKeycloakConfig(): void {
     try {
-      // Get realm name from issuer URL for a more descriptive filename
-      const realmName = this.keycloakConfig.issuer.split('/realms/').pop() || 'config';
-      const defaultFilename = `${realmName}-keycloak-config-${new Date().toISOString().split('T')[0]}.json`;
+      // Get provider-specific name for filename
+      const providerPrefix = this.selectedProvider === 'keycloak' ? 
+        this.keycloakConfig.issuer.split('/realms/').pop() || 'keycloak' :
+        `entra-${this.entraConfig.tenantId}`;
+      
+      const defaultFilename = `${providerPrefix}-oauth-config-${new Date().toISOString().split('T')[0]}.json`;
       
       const configToExport = {
-        keycloak: this.keycloakConfig,
+        oauth: {
+          provider: this.selectedProvider,
+          keycloak: this.keycloakConfig,
+          entra: this.entraConfig
+        },
         api: this.apiConfig,
         exportedAt: new Date().toISOString(),
-        version: '1.0',
-        description: `Configuration for ${this.keycloakConfig.issuer} - Client: ${this.keycloakConfig.clientId}`
+        version: '2.0',
+        description: `OAuth Configuration for ${this.selectedProvider} - ${this.selectedProvider === 'keycloak' ? this.keycloakConfig.issuer : `Entra tenant: ${this.entraConfig.tenantId}`}`
       };
       
       const dataStr = JSON.stringify(configToExport, null, 2);
@@ -435,41 +609,94 @@ export class ConfigComponent {
         const content = e.target?.result as string;
         const importedConfig = JSON.parse(content);
         
-        // Validate the imported configuration
-        if (!importedConfig.keycloak || !importedConfig.keycloak.issuer || !importedConfig.keycloak.clientId) {
-          this.showMessage('Invalid configuration file: missing required Keycloak settings', 'error');
+        // Determine config format version
+        const isNewFormat = importedConfig.oauth && importedConfig.version === '2.0';
+        const isLegacyFormat = importedConfig.keycloak && !importedConfig.oauth;
+        
+        if (!isNewFormat && !isLegacyFormat) {
+          this.showMessage('Invalid configuration file: unrecognized format', 'error');
           return;
         }
         
-        // Import the configuration
-        this.keycloakConfig = {
-          issuer: importedConfig.keycloak.issuer,
-          clientId: importedConfig.keycloak.clientId,
-          redirectUri: importedConfig.keycloak.redirectUri || '',
-          scope: importedConfig.keycloak.scope || 'openid profile email'
-        };
+        // Handle legacy format (v1.0) - Keycloak only
+        if (isLegacyFormat) {
+          if (!importedConfig.keycloak.issuer || !importedConfig.keycloak.clientId) {
+            this.showMessage('Invalid configuration file: missing required Keycloak settings', 'error');
+            return;
+          }
+          
+          this.selectedProvider = 'keycloak';
+          this.keycloakConfig = {
+            issuer: importedConfig.keycloak.issuer,
+            clientId: importedConfig.keycloak.clientId,
+            redirectUri: importedConfig.keycloak.redirectUri || '',
+            scope: importedConfig.keycloak.scope || 'openid profile email'
+          };
+          
+          // Save the imported Keycloak config
+          this.configService.saveKeycloakConfig(this.keycloakConfig);
+        }
         
+        // Handle new format (v2.0) - OAuth with provider selection
+        if (isNewFormat) {
+          const oauthConfig = importedConfig.oauth;
+          
+          if (!oauthConfig.provider || (oauthConfig.provider !== 'keycloak' && oauthConfig.provider !== 'entra')) {
+            this.showMessage('Invalid configuration file: invalid OAuth provider', 'error');
+            return;
+          }
+          
+          this.selectedProvider = oauthConfig.provider;
+          
+          if (oauthConfig.provider === 'keycloak' && oauthConfig.keycloak) {
+            this.keycloakConfig = {
+              issuer: oauthConfig.keycloak.issuer || '',
+              clientId: oauthConfig.keycloak.clientId || '',
+              redirectUri: oauthConfig.keycloak.redirectUri || '',
+              scope: oauthConfig.keycloak.scope || 'openid profile email'
+            };
+            this.configService.saveKeycloakConfig(this.keycloakConfig);
+          }
+          
+          if (oauthConfig.provider === 'entra' && oauthConfig.entra) {
+            this.entraConfig = {
+              tenantId: oauthConfig.entra.tenantId || '',
+              clientId: oauthConfig.entra.clientId || '',
+              redirectUri: oauthConfig.entra.redirectUri || '',
+              scope: oauthConfig.entra.scope || 'openid profile email User.Read',
+              authority: oauthConfig.entra.authority || `https://login.microsoftonline.com/${oauthConfig.entra.tenantId}`
+            };
+            this.configService.saveEntraConfig(this.entraConfig);
+          }
+          
+          // Always import both configs if available
+          if (oauthConfig.keycloak) {
+            this.keycloakConfig = {
+              issuer: oauthConfig.keycloak.issuer || '',
+              clientId: oauthConfig.keycloak.clientId || '',
+              redirectUri: oauthConfig.keycloak.redirectUri || '',
+              scope: oauthConfig.keycloak.scope || 'openid profile email'
+            };
+          }
+          
+          if (oauthConfig.entra) {
+            this.entraConfig = {
+              tenantId: oauthConfig.entra.tenantId || '',
+              clientId: oauthConfig.entra.clientId || '',
+              redirectUri: oauthConfig.entra.redirectUri || '',
+              scope: oauthConfig.entra.scope || 'openid profile email User.Read',
+              authority: oauthConfig.entra.authority || `https://login.microsoftonline.com/${oauthConfig.entra.tenantId}`
+            };
+          }
+        }
+        
+        // Handle API configuration for both formats
         if (importedConfig.api) {
           this.apiConfig = {
             baseUrl: importedConfig.api.baseUrl || '',
             endpoints: importedConfig.api.endpoints || {}
           };
           this.updateEndpointEntries();
-        }
-        
-        // Automatically save the imported configuration locally
-        this.configService.saveKeycloakConfig(this.keycloakConfig);
-        this.authService.configureAuth(this.keycloakConfig);
-        
-        if (importedConfig.api) {
-          // Convert endpoint entries back to the config format for saving
-          const endpointsToSave: { [key: string]: string } = {};
-          Object.entries(this.apiConfig.endpoints || {}).forEach(([name, path]) => {
-            if (name && path) {
-              endpointsToSave[name] = path as string;
-            }
-          });
-          this.apiConfig.endpoints = endpointsToSave;
           this.configService.saveApiConfig(this.apiConfig);
         }
         

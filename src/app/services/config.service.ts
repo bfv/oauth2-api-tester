@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { AppConfig, KeycloakConfig, ApiConfig } from '../models/config.model';
+import { AppConfig, KeycloakConfig, EntraConfig, OAuthConfig, ApiConfig, OAuthProvider } from '../models/config.model';
 
 @Injectable({
   providedIn: 'root'
@@ -16,9 +16,24 @@ export class ConfigService {
     localStorage.setItem(this.STORAGE_KEY, JSON.stringify(config));
   }
 
+  getOAuthConfig(): OAuthConfig | null {
+    const config = this.getConfig();
+    return config?.oauth || null;
+  }
+
   getKeycloakConfig(): KeycloakConfig | null {
     const config = this.getConfig();
-    return config?.keycloak || null;
+    return config?.oauth?.keycloak || null;
+  }
+
+  getEntraConfig(): EntraConfig | null {
+    const config = this.getConfig();
+    return config?.oauth?.entra || null;
+  }
+
+  getCurrentProvider(): OAuthProvider {
+    const config = this.getConfig();
+    return config?.oauth?.provider || 'keycloak';
   }
 
   getApiConfig(): ApiConfig | null {
@@ -26,18 +41,48 @@ export class ConfigService {
     return config?.api || null;
   }
 
-  saveKeycloakConfig(keycloakConfig: KeycloakConfig): void {
+  saveOAuthConfig(oauthConfig: OAuthConfig): void {
     const config = this.getConfig() || {
-      keycloak: keycloakConfig,
+      oauth: oauthConfig,
       api: { baseUrl: '', endpoints: {} }
     };
-    config.keycloak = keycloakConfig;
+    config.oauth = oauthConfig;
+    this.saveConfig(config);
+  }
+
+  saveKeycloakConfig(keycloakConfig: KeycloakConfig): void {
+    const config = this.getConfig() || {
+      oauth: { provider: 'keycloak', keycloak: keycloakConfig },
+      api: { baseUrl: '', endpoints: {} }
+    };
+    
+    if (!config.oauth) {
+      config.oauth = { provider: 'keycloak' };
+    }
+    
+    config.oauth.provider = 'keycloak';
+    config.oauth.keycloak = keycloakConfig;
+    this.saveConfig(config);
+  }
+
+  saveEntraConfig(entraConfig: EntraConfig): void {
+    const config = this.getConfig() || {
+      oauth: { provider: 'entra', entra: entraConfig },
+      api: { baseUrl: '', endpoints: {} }
+    };
+    
+    if (!config.oauth) {
+      config.oauth = { provider: 'entra' };
+    }
+    
+    config.oauth.provider = 'entra';
+    config.oauth.entra = entraConfig;
     this.saveConfig(config);
   }
 
   saveApiConfig(apiConfig: ApiConfig): void {
     const config = this.getConfig() || {
-      keycloak: { issuer: '', clientId: '' },
+      oauth: { provider: 'keycloak' as OAuthProvider },
       api: apiConfig
     };
     config.api = apiConfig;
@@ -54,6 +99,24 @@ export class ConfigService {
       clientId: 'jwt-client',
       redirectUri: window.location.origin + '/auth',
       scope: 'openid profile email'
+    };
+  }
+
+  getDefaultEntraConfig(): EntraConfig {
+    return {
+      tenantId: 'common', // or specific tenant ID
+      clientId: 'your-client-id-here', // Put your actual client ID here for testing
+      redirectUri: 'https://localhost:18820',
+      scope: 'openid profile email User.Read',
+      authority: 'https://login.microsoftonline.com/common'
+    };
+  }
+
+  getDefaultOAuthConfig(): OAuthConfig {
+    return {
+      provider: 'keycloak',
+      keycloak: this.getDefaultKeycloakConfig(),
+      entra: this.getDefaultEntraConfig()
     };
   }
 

@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { ConfigService } from '../../services/config.service';
+import { OAuthProvider } from '../../models/config.model';
 
 @Component({
   selector: 'app-auth',
@@ -21,14 +22,14 @@ import { ConfigService } from '../../services/config.service';
         <div *ngIf="!authService.isProcessing()">
           <p>You are not authenticated. Please log in to continue.</p>
           
-          <div *ngIf="!hasKeycloakConfig()" class="config-warning">
-            <p><strong>⚠️ No Keycloak Configuration Found</strong></p>
-            <p>Please configure your Keycloak settings first in the Configuration tab.</p>
+          <div *ngIf="!hasOAuthConfig()" class="config-warning">
+            <p><strong>⚠️ No OAuth Configuration Found</strong></p>
+            <p>Please configure your {{ getCurrentProviderDisplayName() }} settings first in the Configuration tab.</p>
             <button routerLink="/config" class="btn btn-secondary">Go to Configuration</button>
           </div>
           
-          <div *ngIf="hasKeycloakConfig()">
-            <button (click)="login()" class="btn btn-primary">Login with Keycloak</button>
+          <div *ngIf="hasOAuthConfig()">
+            <button (click)="login()" class="btn btn-primary">Login with {{ getCurrentProviderDisplayName() }}</button>
           </div>
           
           <div *ngIf="authService.errorMessage()" class="error-message">
@@ -41,7 +42,7 @@ import { ConfigService } from '../../services/config.service';
       <div *ngIf="authService.isAuthenticated()" class="authenticated-section">
         <div class="status-card">
           <h3>✅ Authentication Successful</h3>
-          <p>You are successfully authenticated with Keycloak.</p>
+          <p>You are successfully authenticated with {{ getCurrentProviderDisplayName() }}.</p>
           <p><strong>Token Valid:</strong> {{ authService.hasValidToken() ? 'Yes' : 'No' }}</p>
           
           <div class="actions">
@@ -270,6 +271,29 @@ export class AuthComponent {
     public authService: AuthService,
     private configService: ConfigService
   ) {}
+
+  getCurrentProvider(): OAuthProvider {
+    return this.configService.getCurrentProvider();
+  }
+
+  getCurrentProviderDisplayName(): string {
+    const provider = this.getCurrentProvider();
+    return provider === 'keycloak' ? 'Keycloak' : 'Microsoft Entra ID';
+  }
+
+  hasOAuthConfig(): boolean {
+    const provider = this.getCurrentProvider();
+    
+    if (provider === 'keycloak') {
+      const config = this.configService.getKeycloakConfig();
+      return config !== null && !!config.issuer && !!config.clientId;
+    } else if (provider === 'entra') {
+      const config = this.configService.getEntraConfig();
+      return config !== null && !!config.tenantId && !!config.clientId;
+    }
+    
+    return false;
+  }
 
   hasKeycloakConfig(): boolean {
     const config = this.configService.getKeycloakConfig();

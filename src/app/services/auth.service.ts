@@ -4,7 +4,7 @@ import { HttpClient } from '@angular/common/http';
 import { jwtDecode } from 'jwt-decode';
 import { ConfigService } from './config.service';
 import { TokenInfo, DecodedToken } from '../models/api.model';
-import { KeycloakConfig } from '../models/config.model';
+import { KeycloakConfig, EntraConfig, OAuthProvider } from '../models/config.model';
 
 @Injectable({
   providedIn: 'root'
@@ -64,25 +64,49 @@ export class AuthService {
       } else if (event.type === 'discovery_document_validation_error') {
         console.error('❌ Discovery document validation error:', event);
         this.debugLog('Discovery document validation error', event);
-      } else if (event.type === 'logout') {
-        console.log('🚪 User logged out');
-        this._isAuthenticated.set(false);
-        this._tokenInfo.set(null);
-      } else if (event.type === 'token_error') {
-        const errorEvent = event as OAuthErrorEvent;
-        console.error('❌ Token error:', errorEvent);
-        this._errorMessage.set(`Token error: ${errorEvent.reason}`);
-      } else if (event.type === 'discovery_document_loaded') {
-        console.log('📋 Discovery document loaded successfully');
+        
+        // Provide specific guidance based on current provider
+        const currentProvider = this.configService.getCurrentProvider();
+        if (currentProvider === 'entra') {
+          this._errorMessage.set('Microsoft Entra discovery document validation failed. This may be due to tenant configuration or endpoint issues. Please check your Tenant ID and ensure the application is properly registered in Azure Portal.');
+        } else {
+          this._errorMessage.set(`Discovery document validation failed for ${currentProvider}. Please check your configuration.`);
+        }
       } else if (event.type === 'discovery_document_load_error') {
         console.error('❌ Discovery document load error:', event);
+        this.debugLog('Discovery document load error', event);
+        
+        const currentProvider = this.configService.getCurrentProvider();
+        if (currentProvider === 'entra') {
+          this._errorMessage.set('Failed to load Microsoft Entra discovery document. Please verify your Tenant ID is correct and the tenant exists.');
+        } else {
+          this._errorMessage.set(`Failed to load discovery document for ${currentProvider}. Please check your issuer URL.`);
+        }
       }
     });
   }
 
+  configureOAuth(): boolean {
+    const provider = this.configService.getCurrentProvider();
+    
+    if (provider === 'keycloak') {
+      const config = this.configService.getKeycloakConfig();
+      return config ? this.configureKeycloak(config) : false;
+    } else if (provider === 'entra') {
+      const config = this.configService.getEntraConfig();
+      return config ? this.configureEntra(config) : false;
+    }
+    
+    return false;
+  }
+
   configureAuth(config: KeycloakConfig): boolean {
+    return this.configureKeycloak(config);
+  }
+
+  configureKeycloak(config: KeycloakConfig): boolean {
     try {
-      this.debugLog('Configuring auth with config', config);
+      this.debugLog('Configuring Keycloak auth with config', config);
       
       // Determine the correct redirect URI
       let redirectUri = config.redirectUri;
@@ -90,6 +114,15 @@ export class AuthService {
         // Use /auth route since that's where we handle OAuth callbacks
         redirectUri = window.location.origin + '/auth';
         this.debugLog('No redirect URI provided, using /auth route', redirectUri);
+      } else {
+        // Check if the redirect URI is different from our current origin
+        const redirectUrl = new URL(redirectUri);
+        const currentUrl = new URL(window.location.origin);
+        
+        if (redirectUrl.origin !== currentUrl.origin) {
+          this.debugLog('Custom redirect URI detected, will intercept OAuth callback', redirectUri);
+          // We'll handle the custom redirect in the OAuth flow
+        }
       }
       
       const authConfig: AuthConfig = {
@@ -108,16 +141,89 @@ export class AuthService {
         sessionChecksEnabled: true
       };
 
-      this.debugLog('OAuth Auth Config', authConfig);
+      this.debugLog('Keycloak OAuth Auth Config', authConfig);
       
       this.oauthService.configure(authConfig);
       this.oauthService.setupAutomaticSilentRefresh();
       
-      this.debugLog('Auth configuration successful');
+      this.debugLog('Keycloak auth configuration successful');
       return true;
     } catch (error) {
-      console.error('Auth configuration error:', error);
-      this.debugLog('Auth configuration error', error);
+      console.error('Keycloak auth configuration error:', error);
+      this.debugLog('Keycloak auth configuration error', error);
+      this._errorMessage.set(`Configuration error: ${error}`);
+      return false;
+    }
+  }
+
+  configureEntra(config: EntraConfig): boolean {
+    try {
+      this.debugLog('Configuring Entra auth with config', config);
+      
+      // Determine the correct redirect URI
+      let redirectUri = config.redirectUri;
+      if (!redirectUri) {
+        redirectUri = window.location.origin + '/auth';
+        this.debugLog('No redirect URI provided, using /auth route', redirectUri);
+      } else {
+        // Check if the redirect URI is different from our current origin
+        const redirectUrl = new URL(redirectUri);
+        const currentUrl = new URL(window.location.origin);
+        
+        if (redirectUrl.origin !== currentUrl.origin) {
+          this.debugLog('Custom redirect URI detected, will intercept OAuth callback', redirectUri);
+          // We'll handle the custom redirect in the OAuth flow
+        }
+      }
+      
+      // Build authority URL from tenant ID
+      const authority = config.authority || `https://login.microsoftonline.com/${config.tenantId}`;
+      
+      // For Entra, we need to be more explicit about endpoints due to discovery document issues
+      const authConfig: AuthConfig = {
+        issuer: authority,
+        clientId: config.clientId,
+        redirectUri: redirectUri,
+        responseType: 'code',
+        scope: config.scope || 'openid profile email User.Read',
+        showDebugInformation: true,
+        requireHttps: false, // Allow HTTP for development
+        useSilentRefresh: true,
+        silentRefreshRedirectUri: window.location.origin + '/silent-refresh.html',
+        // Enable PKCE for Microsoft Entra (recommended)
+        disablePKCE: false,
+        // Store state/nonce in sessionStorage to survive page reloads
+        sessionChecksEnabled: true,
+        // Entra-specific settings for compatibility
+        oidc: true,
+        strictDiscoveryDocumentValidation: false,
+        // Additional settings to handle Entra's discovery document format
+        skipIssuerCheck: true,
+        // Manually specify endpoints to avoid discovery document issues
+        loginUrl: `${authority}/oauth2/v2.0/authorize`,
+        tokenEndpoint: `${authority}/oauth2/v2.0/token`,
+        userinfoEndpoint: `${authority}/oidc/userinfo`,
+        logoutUrl: `${authority}/oauth2/v2.0/logout`,
+        // Disable some validations that might fail with Entra
+        disableAtHashCheck: true,
+        // Try to use the v2.0 endpoint which is more standard-compliant
+        customQueryParams: {
+          'response_mode': 'query'
+        }
+      };
+
+      this.debugLog('Entra OAuth Auth Config', authConfig);
+      
+      this.oauthService.configure(authConfig);
+      
+      // Don't setup automatic silent refresh for Entra initially due to potential issues
+      // this.oauthService.setupAutomaticSilentRefresh();
+      
+      this.debugLog('Entra auth configuration successful');
+      return true;
+    } catch (error) {
+      console.error('Entra auth configuration error:', error);
+      this.debugLog('Entra auth configuration error', error);
       this._errorMessage.set(`Configuration error: ${error}`);
       return false;
     }
@@ -134,15 +240,32 @@ export class AuthService {
       this.debugLog('URL Parameters', Object.fromEntries(urlParams.entries()));
       
       // CRITICAL: Configure OAuth service before any callback processing
-      const config = this.configService.getKeycloakConfig();
-      if (!config) {
-        this.debugLog('No configuration found - cannot process OAuth callback');
-        this._errorMessage.set('Keycloak configuration not found. Please configure first.');
+      const currentProvider = this.configService.getCurrentProvider();
+      
+      let hasValidConfig = false;
+      if (currentProvider === 'keycloak') {
+        const keycloakConfig = this.configService.getKeycloakConfig();
+        if (!keycloakConfig) {
+          this.debugLog('No Keycloak configuration found - cannot process OAuth callback');
+          this._errorMessage.set('OAuth configuration not found. Please configure first.');
+          return false;
+        }
+        hasValidConfig = this.configureKeycloak(keycloakConfig);
+      } else if (currentProvider === 'entra') {
+        const entraConfig = this.configService.getEntraConfig();
+        if (!entraConfig) {
+          this.debugLog('No Entra configuration found - cannot process OAuth callback');
+          this._errorMessage.set('OAuth configuration not found. Please configure first.');
+          return false;
+        }
+        hasValidConfig = this.configureEntra(entraConfig);
+      } else {
+        this.debugLog('No valid OAuth provider configured');
+        this._errorMessage.set('No OAuth provider configured. Please configure first.');
         return false;
       }
       
-      // Configure OAuth service first
-      if (!this.configureAuth(config)) {
+      if (!hasValidConfig) {
         this.debugLog('Failed to configure OAuth service');
         this._errorMessage.set('Failed to configure OAuth service');
         return false;
@@ -262,8 +385,16 @@ export class AuthService {
             this.debugLog('Authorization code for manual exchange', { code: code?.substring(0, 20) + '...', fullCode: code });
             this.debugLog('About to call manualTokenExchange...');
             try {
-              await this.manualTokenExchange(code, config);
-              this.debugLog('Manual token exchange completed');
+              // Manual token exchange currently only works with Keycloak
+              if (currentProvider === 'keycloak') {
+                const keycloakConfig = this.configService.getKeycloakConfig();
+                if (keycloakConfig) {
+                  await this.manualTokenExchange(code, keycloakConfig);
+                  this.debugLog('Manual token exchange completed');
+                }
+              } else {
+                this.debugLog('Manual token exchange not implemented for Entra - relying on OAuth library');
+              }
             } catch (manualError) {
               this.debugLog('Manual token exchange threw error', manualError);
             }
@@ -273,8 +404,14 @@ export class AuthService {
             if (!actualToken || actualToken.length < 10) {
               this.debugLog('OAuth service lies - no real token found, forcing manual exchange');
               try {
-                await this.manualTokenExchange(code, config);
-                this.debugLog('Forced manual token exchange completed');
+                // Manual token exchange currently only works with Keycloak
+                if (currentProvider === 'keycloak') {
+                  const keycloakConfig = this.configService.getKeycloakConfig();
+                  if (keycloakConfig) {
+                    await this.manualTokenExchange(code, keycloakConfig);
+                    this.debugLog('Forced manual token exchange completed');
+                  }
+                }
               } catch (manualError) {
                 this.debugLog('Forced manual token exchange threw error', manualError);
               }
@@ -344,17 +481,32 @@ export class AuthService {
     this.debugLog('Login method called');
     this._errorMessage.set('');
     
-    // Ensure we have configuration before attempting login
-    const config = this.configService.getKeycloakConfig();
-    this.debugLog('Retrieved config for login', config);
+    // Determine current provider and get configuration
+    const currentProvider = this.configService.getCurrentProvider();
+    let configExists = false;
     
-    if (!config) {
-      this._errorMessage.set('Please configure Keycloak settings first');
+    if (currentProvider === 'keycloak') {
+      const config = this.configService.getKeycloakConfig();
+      if (!config) {
+        this._errorMessage.set('Please configure Keycloak settings first');
+        return;
+      }
+      configExists = this.configureKeycloak(config);
+      this.debugLog('Retrieved Keycloak config for login', config);
+    } else if (currentProvider === 'entra') {
+      const config = this.configService.getEntraConfig();
+      if (!config) {
+        this._errorMessage.set('Please configure Microsoft Entra settings first');
+        return;
+      }
+      configExists = this.configureEntra(config);
+      this.debugLog('Retrieved Entra config for login', config);
+    } else {
+      this._errorMessage.set('Please select and configure an OAuth provider first');
       return;
     }
     
-    // Configure and initialize OAuth service before login
-    if (!this.configureAuth(config)) {
+    if (!configExists) {
       this._errorMessage.set('Failed to configure authentication');
       return;
     }
@@ -380,7 +532,7 @@ export class AuthService {
       try {
         this.debugLog('About to call initCodeFlow()...');
         
-        // Log the exact parameters that will be sent to Keycloak
+        // Log the exact parameters that will be sent to OAuth provider
         this.debugLog('OAuth authorization URL parameters', {
           authorizationEndpoint: (this.oauthService as any).authorizationEndpoint,
           issuer: this.oauthService.issuer,
@@ -392,17 +544,33 @@ export class AuthService {
           nonce: (this.oauthService as any).nonce
         });
         
-        // Manually construct what the authorization URL should look like
-        const authUrl = `${config.issuer}/protocol/openid-connect/auth?` +
-          `client_id=${encodeURIComponent(config.clientId)}&` +
-          `redirect_uri=${encodeURIComponent(window.location.origin)}&` +
-          `response_type=code&` +
-          `scope=${encodeURIComponent(config.scope || 'openid profile email')}`;
+        // Manually construct what the authorization URL should look like for debugging
+        let expectedAuthUrl = '';
+        if (currentProvider === 'keycloak') {
+          const keycloakConfig = this.configService.getKeycloakConfig();
+          if (keycloakConfig) {
+            expectedAuthUrl = `${keycloakConfig.issuer}/protocol/openid-connect/auth?` +
+              `client_id=${encodeURIComponent(keycloakConfig.clientId)}&` +
+              `redirect_uri=${encodeURIComponent(window.location.origin + '/auth')}&` +
+              `response_type=code&` +
+              `scope=${encodeURIComponent(keycloakConfig.scope || 'openid profile email')}`;
+          }
+        } else if (currentProvider === 'entra') {
+          const entraConfig = this.configService.getEntraConfig();
+          if (entraConfig) {
+            const authority = entraConfig.authority || `https://login.microsoftonline.com/${entraConfig.tenantId}`;
+            expectedAuthUrl = `${authority}/oauth2/v2.0/authorize?` +
+              `client_id=${encodeURIComponent(entraConfig.clientId)}&` +
+              `redirect_uri=${encodeURIComponent(window.location.origin + '/auth')}&` +
+              `response_type=code&` +
+              `scope=${encodeURIComponent(entraConfig.scope || 'openid profile email User.Read')}`;
+          }
+        }
           
-        this.debugLog('Expected authorization URL', authUrl);
+        this.debugLog('Expected authorization URL', expectedAuthUrl);
         
         this.oauthService.initCodeFlow();
-        this.debugLog('initCodeFlow() called - should redirect to Keycloak now');
+        this.debugLog(`initCodeFlow() called - should redirect to ${currentProvider} now`);
       } catch (error) {
         this.debugLog('Error during initCodeFlow()', error);
         this._errorMessage.set(`Code flow initiation failed: ${error}`);
@@ -413,12 +581,14 @@ export class AuthService {
       let errorMessage = 'Login initialization failed';
       
       if (error.status === 0) {
-        errorMessage = 'Cannot connect to Keycloak server. Please check:\n' +
+        errorMessage = `Cannot connect to ${currentProvider === 'keycloak' ? 'Keycloak' : 'Microsoft Entra'} server. Please check:\n` +
                       '1. Server is running and accessible\n' +
-                      '2. CORS is configured in Keycloak\n' +
+                      `2. CORS is configured in ${currentProvider === 'keycloak' ? 'Keycloak' : 'Entra'}\n` +
                       '3. URL is correct in configuration';
       } else if (error.status === 404) {
-        errorMessage = 'Keycloak realm not found. Please check your issuer URL.';
+        errorMessage = currentProvider === 'keycloak' ? 
+          'Keycloak realm not found. Please check your issuer URL.' :
+          'Entra tenant not found. Please check your tenant ID.';
       } else {
         errorMessage = `Login failed: ${error.message || error}`;
       }
@@ -455,21 +625,33 @@ export class AuthService {
 
   private checkInitialAuthState(): void {
     // Check if we have a stored configuration and try to initialize
-    const config = this.configService.getKeycloakConfig();
-    if (config) {
-      if (this.configureAuth(config)) {
-        // Set processing state during initialization
-        this._isProcessing.set(true);
-        this.initializeAuth().then((success) => {
-          this._isProcessing.set(false);
-          if (success) {
-            console.log('Initial authentication successful');
-          }
-        }).catch((error) => {
-          this._isProcessing.set(false);
-          console.error('Initial authentication failed:', error);
-        });
+    const currentProvider = this.configService.getCurrentProvider();
+    let hasConfig = false;
+    
+    if (currentProvider === 'keycloak') {
+      const keycloakConfig = this.configService.getKeycloakConfig();
+      if (keycloakConfig) {
+        hasConfig = this.configureKeycloak(keycloakConfig);
       }
+    } else if (currentProvider === 'entra') {
+      const entraConfig = this.configService.getEntraConfig();
+      if (entraConfig) {
+        hasConfig = this.configureEntra(entraConfig);
+      }
+    }
+    
+    if (hasConfig) {
+      // Set processing state during initialization
+      this._isProcessing.set(true);
+      this.initializeAuth().then((success) => {
+        this._isProcessing.set(false);
+        if (success) {
+          console.log('Initial authentication successful');
+        }
+      }).catch((error) => {
+        this._isProcessing.set(false);
+        console.error('Initial authentication failed:', error);
+      });
     }
   }
 
