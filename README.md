@@ -1,59 +1,147 @@
-# KeycloakJwtClient
+# Keycloak JWT Client
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 20.1.4.
+A simple Angular web application to test JWT token integration between Keycloak and Progress OpenEdge PAS instances.
 
-## Development server
+## Features
 
-To start a local development server, run:
+- **Keycloak Configuration**: Configure Keycloak server settings (issuer, client ID, redirect URI, scope) through a web UI
+- **Authentication**: Login using OpenID Connect Authorization Code Flow with PKCE
+- **Token Display**: View both raw and decoded JWT tokens (access, refresh, and ID tokens)
+- **API Testing**: Make HTTP requests (GET, POST, PUT, DELETE) to configurable endpoints with automatic JWT Bearer token inclusion
+- **Persistent Configuration**: All settings are saved in localStorage and persist across browser sessions
 
-```bash
-ng serve
-```
+## Getting Started
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+### Prerequisites
 
-## Code scaffolding
+- Node.js 18+ installed
+- Angular CLI 20.1.4+ installed
+- A running Keycloak server
+- A Progress OpenEdge PAS instance (optional, for testing)
 
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+### Installation
 
-```bash
-ng generate component component-name
-```
+1. The project is already set up in this directory
+2. Dependencies are already installed
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
-
-```bash
-ng generate --help
-```
-
-## Building
-
-To build the project run:
+### Running the Application
 
 ```bash
-ng build
+npm start
 ```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
+The application will be available at `http://localhost:4200`
 
-## Running unit tests
+## Usage
 
-To execute unit tests with the [Karma](https://karma-runner.github.io) test runner, use the following command:
+### 1. Configuration
+
+1. Navigate to the **Configuration** tab
+2. Enter your Keycloak settings:
+   - **Issuer URL**: Your Keycloak realm URL (e.g., `http://localhost:8080/realms/master`)
+   - **Client ID**: Your Keycloak client ID
+   - **Redirect URI**: The application URL (defaults to current origin)
+   - **Scope**: OIDC scopes (e.g., `openid profile email`)
+
+3. Configure your API endpoints:
+   - **Base URL**: Your PAS server URL (e.g., `http://localhost:8810`)
+   - **Endpoints**: Define named endpoints with their paths
+
+4. Save the configuration
+
+### 2. Authentication
+
+1. Navigate to the **Authentication** tab
+2. Click **Login with Keycloak**
+3. Complete the login flow in Keycloak
+4. You'll be redirected back with authentication status
+
+### 3. Token Display
+
+1. Navigate to the **Token Display** tab (available after authentication)
+2. View token summary (type, expiration, scope, validity)
+3. View and copy raw tokens
+4. View decoded token headers and payloads
+5. Available for Access Token, Refresh Token, and ID Token
+
+### 4. API Testing
+
+1. Navigate to the **API Test** tab (available after authentication)
+2. Configure your request:
+   - Select HTTP method (GET, POST, PUT, DELETE)
+   - Enter or select endpoint URL
+   - Add request body (for POST/PUT)
+   - Add custom headers
+3. Send request - JWT token is automatically included as Bearer token
+4. View response with status, headers, and body
+5. Copy response data
+
+## Configuration Persistence
+
+All configuration is automatically saved to localStorage:
+- Keycloak settings
+- API endpoints
+- The configuration persists across browser sessions and page reloads
+
+## Default Configuration
+
+The application comes with sensible defaults:
+- **Keycloak Issuer**: `http://localhost:8080/realms/master`
+- **Client ID**: `jwt-client`
+- **Scope**: `openid profile email`
+- **API Base URL**: `http://localhost:8810`
+- **Test Endpoint**: `/web/test`
+
+## Security Features
+
+- Uses PKCE (Proof Key for Code Exchange) for secure OAuth2 flow
+- Automatic token refresh
+- Token validation
+- Secure token storage
+
+## Development
+
+### Project Structure
+
+```
+src/
+├── app/
+│   ├── components/
+│   │   ├── auth/           # Authentication component
+│   │   ├── config/         # Configuration component
+│   │   ├── token-display/  # Token display component
+│   │   └── api-test/       # API test component
+│   ├── services/
+│   │   ├── auth.service.ts     # Authentication service
+│   │   ├── config.service.ts   # Configuration service
+│   │   └── api.service.ts      # API service
+│   ├── models/
+│   │   ├── config.model.ts     # Configuration interfaces
+│   │   └── api.model.ts        # API interfaces
+│   └── ...
+```
+
+### Building for Production
 
 ```bash
-ng test
+npm run build
 ```
 
-## Running end-to-end tests
-
-For end-to-end (e2e) testing, run:
+### Running Tests
 
 ```bash
-ng e2e
+npm test
 ```
 
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
+## Troubleshooting
 
-## Additional Resources
+### Common Issues
 
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+1. **CORS Issues**: Ensure your Keycloak and PAS servers are configured to allow the application origin
+2. **Invalid Client**: Verify the client ID exists in Keycloak and is configured for public clients
+3. **Redirect URI Mismatch**: Ensure the redirect URI in Keycloak matches the application URL
+4. **Token Expired**: Use the refresh token functionality or re-authenticate
+
+### Support
+
+This is a development/testing tool. For production use, ensure proper security configurations in both Keycloak and your PAS server.
