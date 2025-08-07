@@ -68,7 +68,6 @@ import { KeycloakConfig, EntraConfig, ApiConfig, OAuthProvider } from '../../mod
               <small class="help-text">
                 🔧 <strong>Custom Redirect URI Support:</strong> You can use custom redirect URIs like <code>http://localhost:18820</code>. 
                 To use a custom redirect URI, serve the <code>oauth-redirect.html</code> file from the project root at your custom URL.
-                <br>Example: Copy <code>oauth-redirect.html</code> to your custom server and update the <code>MAIN_APP_URL</code> constant.
               </small>
             </div>
             
@@ -125,7 +124,6 @@ import { KeycloakConfig, EntraConfig, ApiConfig, OAuthProvider } from '../../mod
               <small class="help-text">
                 🔧 <strong>Custom Redirect URI Support:</strong> You can use custom redirect URIs like <code>https://localhost:18820</code>. 
                 To use a custom redirect URI, serve the <code>oauth-redirect.html</code> file from the project root at your custom URL.
-                <br>Example: Copy <code>oauth-redirect.html</code> to your custom server and update the <code>MAIN_APP_URL</code> constant.
               </small>
             </div>
             
@@ -196,9 +194,11 @@ import { KeycloakConfig, EntraConfig, ApiConfig, OAuthProvider } from '../../mod
             <button type="button" (click)="addEndpoint()" class="btn btn-secondary btn-sm">Add Endpoint</button>
           </div>
           
-          <button type="submit" [disabled]="!apiForm.form.valid" class="btn btn-primary">
-            Save API Config
-          </button>
+          <div class="api-submit-section">
+            <button type="submit" [disabled]="!apiForm.form.valid" class="btn btn-primary">
+              Save API Config
+            </button>
+          </div>
         </form>
       </div>
       
@@ -304,6 +304,8 @@ import { KeycloakConfig, EntraConfig, ApiConfig, OAuthProvider } from '../../mod
       background-color: #f8f9fa;
       border-left: 3px solid #007bff;
       border-radius: 3px;
+      display: block;
+      line-height: 1.5;
     }
     
     .help-text small {
@@ -346,6 +348,12 @@ import { KeycloakConfig, EntraConfig, ApiConfig, OAuthProvider } from '../../mod
     }
     
     .export-import-section {
+      margin-top: 20px;
+      padding-top: 15px;
+      border-top: 1px solid #ddd;
+    }
+    
+    .api-submit-section {
       margin-top: 20px;
       padding-top: 15px;
       border-top: 1px solid #ddd;

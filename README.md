@@ -26,11 +26,37 @@ A simple Angular web application to test JWT token integration between Keycloak 
 
 ### Running the Application
 
+#### Local Development
 ```bash
 npm start
 ```
 
 The application will be available at `http://localhost:4200`
+
+#### Docker (Recommended for Production)
+
+**Quick Start:**
+```bash
+# Build and run with Docker Compose
+npm run docker:prod
+```
+
+**Development with hot reloading:**
+```bash
+# Start development services
+npm run docker:dev
+```
+
+**Manual Docker commands:**
+```bash
+# Build the image
+npm run docker:build
+
+# Run the container
+npm run docker:run
+```
+
+For detailed Docker instructions, see [DOCKER.md](./DOCKER.md).
 
 ## Usage
 

@@ -55,11 +55,8 @@
     </div>
 
     <script>
-        // This page can be served at any URL (like https://localhost:18820)
-        // It will automatically redirect OAuth callbacks to your main Angular application
-        
-        // CONFIGURATION - Update this URL to point to your Angular application
-        const MAIN_APP_URL = 'http://localhost:4200'; // Change this as needed
+        // OAuth callback handler that redirects to the main Angular application
+        const MAIN_APP_URL = 'http://localhost:4200';
         
         function handleOAuthCallback() {
             try {

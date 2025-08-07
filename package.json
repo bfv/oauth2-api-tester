@@ -8,7 +8,12 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "callback-server": "node scripts/oauth-callback-server.js",
-    "callback-server:custom": "node scripts/oauth-callback-server.js"
+    "callback-server:custom": "node scripts/oauth-callback-server.js",
+    "docker:build": "docker build -t keycloak-jwt-client .",
+    "docker:run": "docker run -p 8080:80 keycloak-jwt-client",
+    "docker:dev": "docker-compose --profile dev up --build",
+    "docker:prod": "docker-compose up --build",
+    "docker:stop": "docker-compose down"
   },
   "prettier": {
     "overrides": [
