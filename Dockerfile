@@ -23,7 +23,7 @@ FROM nginx:alpine
 COPY nginx.conf /etc/nginx/nginx.conf
 
 # Copy built app from builder stage
-COPY --from=builder /app/dist/keycloak-jwt-client /usr/share/nginx/html
+COPY --from=builder /app/dist/oauth2-api-tester /usr/share/nginx/html
 
 # Copy SSL certificates if they exist
 COPY cert.pem /etc/ssl/certs/cert.pem

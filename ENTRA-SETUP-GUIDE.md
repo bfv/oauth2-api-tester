@@ -37,7 +37,7 @@ Go to **Token configuration**:
 
 1. **Start HTTPS Redirect Server:**
    ```bash
-   cd c:\dev\oe\cokz\cert-app\ngclient\keycloak-jwt-client
+   cd c:\dev\oe\cokz\cert-app\ngclient\oauth2-api-tester
    ws --port 18820 --https --spa oauth-redirect.html
    ```
 

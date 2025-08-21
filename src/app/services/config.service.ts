@@ -5,7 +5,7 @@ import { AppConfig, KeycloakConfig, EntraConfig, OAuthConfig, ApiConfig, OAuthPr
   providedIn: 'root'
 })
 export class ConfigService {
-  private readonly STORAGE_KEY = 'keycloak-jwt-client-config';
+  private readonly STORAGE_KEY = 'oauth2-api-tester-config';
 
   getConfig(): AppConfig | null {
     const stored = localStorage.getItem(this.STORAGE_KEY);

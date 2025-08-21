@@ -1,9 +1,9 @@
 version: '3.8'
 
 services:
-  keycloak-jwt-client:
+  oauth2-api-tester:
     build: .
-    container_name: keycloak-jwt-client
+    container_name: oauth2-api-tester
     ports:
       - "8080:80"
       - "8443:443"
@@ -24,9 +24,9 @@ services:
       - jwt-client-network
 
   # Optional: Add a development service for hot reloading
-  keycloak-jwt-client-dev:
+  oauth2-api-tester-dev:
     image: node:20-alpine
-    container_name: keycloak-jwt-client-dev
+    container_name: oauth2-api-tester-dev
     working_dir: /app
     volumes:
       - ./:/app

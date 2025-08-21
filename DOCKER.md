@@ -10,10 +10,10 @@ Build and run the production version:
 
 ```bash
 # Build the Docker image
-docker build -t keycloak-jwt-client .
+docker build -t oauth2-api-tester .
 
 # Run the container
-docker run -p 8080:80 keycloak-jwt-client
+docker run -p 8080:80 oauth2-api-tester
 ```
 
 The application will be available at http://localhost:8080
@@ -46,7 +46,7 @@ docker-compose --profile dev up --build
 ## Available Services
 
 ### Production Service
-- **Service**: `keycloak-jwt-client`
+- **Service**: `oauth2-api-tester`
 - **Ports**: 8080 (HTTP), 8443 (HTTPS)
 - **Image**: Multi-stage build with nginx
 - **Health Check**: Available at `/health`
@@ -72,25 +72,25 @@ The application includes SSL certificate support:
 ### Building
 ```bash
 # Build the image
-docker build -t keycloak-jwt-client .
+docker build -t oauth2-api-tester .
 
 # Build with custom tag
-docker build -t keycloak-jwt-client:v1.0.0 .
+docker build -t oauth2-api-tester:v1.0.0 .
 ```
 
 ### Running
 ```bash
 # Run with port mapping
-docker run -p 8080:80 keycloak-jwt-client
+docker run -p 8080:80 oauth2-api-tester
 
 # Run in background
-docker run -d -p 8080:80 keycloak-jwt-client
+docker run -d -p 8080:80 oauth2-api-tester
 
 # Run with SSL certificates
 docker run -p 8080:80 -p 8443:443 \
   -v $(pwd)/cert.pem:/etc/ssl/certs/cert.pem:ro \
   -v $(pwd)/key.pem:/etc/ssl/certs/key.pem:ro \
-  keycloak-jwt-client
+  oauth2-api-tester
 ```
 
 ### Docker Compose Commands
@@ -111,7 +111,7 @@ docker-compose down
 docker-compose logs -f
 
 # Scale services
-docker-compose up --scale keycloak-jwt-client=3
+docker-compose up --scale oauth2-api-tester=3
 ```
 
 ## Configuration
@@ -141,7 +141,7 @@ The nginx configuration (`nginx.conf`) includes:
 
 1. **Port conflicts**: Change the port mapping if 8080 is in use
    ```bash
-   docker run -p 3000:80 keycloak-jwt-client
+   docker run -p 3000:80 oauth2-api-tester
    ```
 
 2. **SSL certificate errors**: Ensure certificates exist or comment out SSL server block
@@ -149,7 +149,7 @@ The nginx configuration (`nginx.conf`) includes:
 3. **Build failures**: Check that Node.js dependencies are compatible
    ```bash
    # Clean build
-   docker build --no-cache -t keycloak-jwt-client .
+   docker build --no-cache -t oauth2-api-tester .
    ```
 
 ### Health Checks
@@ -165,7 +165,7 @@ View application logs:
 docker logs <container_id>
 
 # Docker compose logs
-docker-compose logs keycloak-jwt-client
+docker-compose logs oauth2-api-tester
 ```
 
 ## Performance Optimization
@@ -201,7 +201,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Build Docker image
-        run: docker build -t keycloak-jwt-client .
+        run: docker build -t oauth2-api-tester .
       - name: Run tests
-        run: docker run --rm keycloak-jwt-client npm test
+        run: docker run --rm oauth2-api-tester npm test
 ```

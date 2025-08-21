@@ -10,7 +10,7 @@ import { AuthService } from './services/auth.service';
   styleUrl: './app.css'
 })
 export class App {
-  protected readonly title = signal('Keycloak JWT Client');
+  protected readonly title = signal('Oauth2 API Tester');
 
   constructor(
     public authService: AuthService,

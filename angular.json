@@ -3,7 +3,7 @@
   "version": 1,
   "newProjectRoot": "projects",
   "projects": {
-    "keycloak-jwt-client": {
+    "oauth2-api-tester": {
       "projectType": "application",
       "schematics": {},
       "root": "",
@@ -53,10 +53,10 @@
           "builder": "@angular/build:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "keycloak-jwt-client:build:production"
+              "buildTarget": "oauth2-api-tester:build:production"
             },
             "development": {
-              "buildTarget": "keycloak-jwt-client:build:development"
+              "buildTarget": "oauth2-api-tester:build:development"
             }
           },
           "defaultConfiguration": "development"

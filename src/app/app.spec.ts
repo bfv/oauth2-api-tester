@@ -20,6 +20,6 @@ describe('App', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('h1')?.textContent).toContain('Hello, keycloak-jwt-client');
+    expect(compiled.querySelector('h1')?.textContent).toContain('Hello, oauth2-api-tester');
   });
 });
