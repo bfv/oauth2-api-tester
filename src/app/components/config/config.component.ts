@@ -25,9 +25,8 @@ import { KeycloakConfig, EntraConfig, ApiConfig, OAuthProvider } from '../../mod
               Keycloak
             </label>
             <label class="radio-label disabled">
-              <input type="radio" [(ngModel)]="selectedProvider" value="entra" name="provider" (change)="onProviderChange()" disabled>
+              <input type="radio" [(ngModel)]="selectedProvider" value="entra" name="provider" (change)="onProviderChange()">
               Microsoft Entra ID
-              <small class="disabled-note">(Temporarily disabled - awaiting configuration access)</small>
             </label>
           </div>
         </div>
@@ -400,18 +399,9 @@ export class ConfigComponent {
   private loadCurrentConfig(): void {
     const savedConfig = this.configService.getConfig();
     
-    // Load current provider - force Keycloak since Entra is temporarily disabled
+    // Load current provider - now allow Entra selection
     const savedProvider = this.configService.getCurrentProvider();
-    this.selectedProvider = savedProvider === 'entra' ? 'keycloak' : savedProvider;
-    
-    // If the saved config was Entra, switch to Keycloak and save the change
-    if (savedProvider === 'entra') {
-      this.configService.saveOAuthConfig({
-        provider: 'keycloak',
-        keycloak: this.configService.getKeycloakConfig() || this.configService.getDefaultKeycloakConfig(),
-        entra: this.configService.getEntraConfig() || this.configService.getDefaultEntraConfig()
-      });
-    }
+    this.selectedProvider = savedProvider;    
     
     // Load configurations
     this.keycloakConfig = this.configService.getKeycloakConfig() || this.configService.getDefaultKeycloakConfig();

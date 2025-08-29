@@ -1,5 +1,5 @@
 # Multi-stage build for Angular application
-FROM node:20-alpine as builder
+FROM node:20-alpine AS builder
 
 # Set working directory
 WORKDIR /app
@@ -7,8 +7,8 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production && npm cache clean --force
+# Install dependencies (including dev dependencies needed for build)
+RUN npm ci && npm cache clean --force
 
 # Copy source code
 COPY . .
@@ -23,7 +23,7 @@ FROM nginx:alpine
 COPY nginx.conf /etc/nginx/nginx.conf
 
 # Copy built app from builder stage
-COPY --from=builder /app/dist/oauth2-api-tester /usr/share/nginx/html
+COPY --from=builder /app/dist/oauth2-api-tester/browser /usr/share/nginx/html
 
 # Copy SSL certificates if they exist
 COPY cert.pem /etc/ssl/certs/cert.pem
