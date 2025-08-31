@@ -95,8 +95,8 @@ export class ConfigService {
 
   getDefaultKeycloakConfig(): KeycloakConfig {
     return {
-      issuer: 'https://keycloak.bfv.io:8443/realms/cokz',
-      clientId: 'jwt-client',
+      issuer: 'https://keycloak.bfv.io:8443/realms/<realm>',
+      clientId: '<client-id>',
       redirectUri: window.location.origin + '/auth',
       scope: 'openid profile email'
     };
@@ -106,7 +106,7 @@ export class ConfigService {
     return {
       tenantId: 'common', // or specific tenant ID
       clientId: 'your-client-id-here', // Put your actual client ID here for testing
-      redirectUri: 'https://localhost:18820',
+      redirectUri: 'https://localhost:4200',
       scope: 'openid profile email User.Read',
       authority: 'https://login.microsoftonline.com/common'
     };
