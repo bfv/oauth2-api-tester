@@ -4,7 +4,7 @@
     
     <nav class="app-nav">
       <button routerLink="/config" class="nav-button">Configuration</button>
-      <button routerLink="/auth" class="nav-button">Authentication</button>
+      <button routerLink="/auth" class="nav-button" [disabled]="!configService.hasOAuthConfig()">Authentication</button>
       <button routerLink="/tokens" class="nav-button" [disabled]="!authService.isAuthenticated()">Token Display</button>
       <button routerLink="/api-test" class="nav-button" [disabled]="!authService.isAuthenticated()">API Test</button>
     </nav>

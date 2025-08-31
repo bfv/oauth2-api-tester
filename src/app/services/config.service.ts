@@ -128,4 +128,24 @@ export class ConfigService {
       }
     };
   }
+
+  hasOAuthConfig(): boolean {
+    const provider = this.getCurrentProvider();
+    if (provider === 'keycloak') {
+      const config = this.getKeycloakConfig();
+      return config !== null && 
+             !!config.issuer && 
+             !!config.clientId && 
+             !config.clientId.includes('<') && 
+             !config.clientId.includes('>');
+    } else if (provider === 'entra') {
+      const config = this.getEntraConfig();
+      return config !== null && 
+             !!config.tenantId && 
+             !!config.clientId && 
+             !config.clientId.includes('<') && 
+             !config.clientId.includes('>');
+    }
+    return false;
+  }
 }

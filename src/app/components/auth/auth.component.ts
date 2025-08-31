@@ -12,78 +12,74 @@ import { OAuthProvider } from '../../models/config.model';
   template: `
     <div class="auth-container">
       <h2>Authentication</h2>
-      
-      <div *ngIf="!authService.isAuthenticated()" class="login-section">
-        <div class="auth-info">
-          <p><strong>Authorization Server URL:</strong> {{ getAuthServerUrl() }}</p>
-          <p><strong>Client ID:</strong> {{ getClientId() }}</p>
-        </div>
-        <div *ngIf="authService.isProcessing()" class="processing-message">
-          <p>🔄 Processing authentication...</p>
-          <p>Please wait while we complete the login process.</p>
-        </div>
-        
-        <div *ngIf="!authService.isProcessing()">
-          <div class="unauth-box">
-            <p>You are not authenticated. Please log in to continue.</p>
-            <div *ngIf="!hasOAuthConfig()" class="config-warning">
-              <p><strong>⚠️ No OAuth Configuration Found</strong></p>
-              <p>Please configure your {{ getCurrentProviderDisplayName() }} settings first in the Configuration tab.</p>
-              <button routerLink="/config" class="btn btn-secondary">Go to Configuration</button>
+      <ng-container *ngIf="hasOAuthConfig(); else disabledAuth">
+        <!-- ...existing authentication page content... -->
+        <div *ngIf="!authService.isAuthenticated()" class="login-section">
+          <div class="auth-info">
+            <p><strong>Authorization Server URL:</strong> {{ getAuthServerUrl() }}</p>
+            <p><strong>Client ID:</strong> {{ getClientId() }}</p>
+          </div>
+          <div *ngIf="authService.isProcessing()" class="processing-message">
+            <p>🔄 Processing authentication...</p>
+            <p>Please wait while we complete the login process.</p>
+          </div>
+          <div *ngIf="!authService.isProcessing()">
+            <div class="unauth-box">
+              <p>You are not authenticated. Please log in to continue.</p>
+              <button (click)="login()" class="btn btn-primary" [disabled]="!hasOAuthConfig() || authService.isProcessing()">Login with {{ getCurrentProviderDisplayName() }}</button>
             </div>
-            <div *ngIf="hasOAuthConfig()">
-              <button (click)="login()" class="btn btn-primary">Login with {{ getCurrentProviderDisplayName() }}</button>
+            <div *ngIf="authService.errorMessage()" class="error-message">
+              <strong>Error:</strong>
+              <pre>{{ authService.errorMessage() }}</pre>
             </div>
           </div>
-          <div *ngIf="authService.errorMessage()" class="error-message">
-            <strong>Error:</strong>
-            <pre>{{ authService.errorMessage() }}</pre>
+        </div>
+        <div *ngIf="authService.isAuthenticated()" class="authenticated-section">
+          <div class="auth-info">
+            <p><strong>Authorization Server URL:</strong> {{ getAuthServerUrl() }}</p>
+            <p><strong>Client ID:</strong> {{ getClientId() }}</p>
+          </div>
+          <div class="status-card">
+            <h3>✅ Authentication Successful</h3>
+            <p>You are successfully authenticated with {{ getCurrentProviderDisplayName() }}.</p>
+            <p><strong>Token Valid:</strong> {{ authService.hasValidToken() ? 'Yes' : 'No' }}</p>
+            <div class="actions">
+              <button (click)="refreshToken()" class="btn btn-secondary" [disabled]="refreshing">
+                {{ refreshing ? 'Refreshing...' : 'Refresh Token' }}
+              </button>
+              <button (click)="logout()" class="btn btn-danger">Logout</button>
+            </div>
+          </div>
+          <div *ngIf="refreshMessage" class="message" [class]="refreshMessageType">
+            {{ refreshMessage }}
           </div>
         </div>
-      </div>
-      
-      <div *ngIf="authService.isAuthenticated()" class="authenticated-section">
-        <div class="auth-info">
-          <p><strong>Authorization Server URL:</strong> {{ getAuthServerUrl() }}</p>
-          <p><strong>Client ID:</strong> {{ getClientId() }}</p>
-        </div>
-        <div class="status-card">
-          <h3>✅ Authentication Successful</h3>
-          <p>You are successfully authenticated with {{ getCurrentProviderDisplayName() }}.</p>
-          <p><strong>Token Valid:</strong> {{ authService.hasValidToken() ? 'Yes' : 'No' }}</p>
-          
-          <div class="actions">
-            <button (click)="refreshToken()" class="btn btn-secondary" [disabled]="refreshing">
-              {{ refreshing ? 'Refreshing...' : 'Refresh Token' }}
-            </button>
-            <button (click)="logout()" class="btn btn-danger">Logout</button>
+        <!-- Debug Section -->
+        <div class="debug-section">
+          <h3>🔧 Debug Information</h3>
+          <button (click)="showDebugLog = !showDebugLog" class="btn btn-secondary btn-sm">
+            {{ showDebugLog ? 'Hide' : 'Show' }} OAuth Debug Log
+          </button>
+          <button (click)="clearDebugLog()" class="btn btn-secondary btn-sm">Clear Log</button>
+          <div *ngIf="showDebugLog" class="debug-log">
+            <h4>Recent OAuth Events:</h4>
+            <div *ngIf="getDebugLog().length === 0" class="no-events">
+              No OAuth events recorded yet.
+            </div>
+            <div *ngFor="let event of getDebugLog(); trackBy: trackByIndex" class="debug-event">
+              <strong>{{ event.timestamp }}</strong> - {{ event.type }}
+              <pre *ngIf="event.data">{{ formatJson(event.data) }}</pre>
+            </div>
           </div>
         </div>
-        
-        <div *ngIf="refreshMessage" class="message" [class]="refreshMessageType">
-          {{ refreshMessage }}
+      </ng-container>
+      <ng-template #disabledAuth>
+        <div class="auth-disabled">
+          <h3>Authentication Disabled</h3>
+          <p>No OAuth configuration found. Please configure your provider in the Configuration tab.</p>
+          <button routerLink="/config" class="btn btn-secondary">Go to Configuration</button>
         </div>
-      </div>
-      
-      <!-- Debug Section -->
-      <div class="debug-section">
-        <h3>🔧 Debug Information</h3>
-        <button (click)="showDebugLog = !showDebugLog" class="btn btn-secondary btn-sm">
-          {{ showDebugLog ? 'Hide' : 'Show' }} OAuth Debug Log
-        </button>
-        <button (click)="clearDebugLog()" class="btn btn-secondary btn-sm">Clear Log</button>
-        
-        <div *ngIf="showDebugLog" class="debug-log">
-          <h4>Recent OAuth Events:</h4>
-          <div *ngIf="getDebugLog().length === 0" class="no-events">
-            No OAuth events recorded yet.
-          </div>
-          <div *ngFor="let event of getDebugLog(); trackBy: trackByIndex" class="debug-event">
-            <strong>{{ event.timestamp }}</strong> - {{ event.type }}
-            <pre *ngIf="event.data">{{ formatJson(event.data) }}</pre>
-          </div>
-        </div>
-      </div>
+      </ng-template>
     </div>
   `,
   styles: [`
@@ -98,7 +94,16 @@ import { OAuthProvider } from '../../models/config.model';
       padding: 20px;
     }
     
-    .status-card {
+    button.btn:disabled,
+    .btn:disabled {
+      opacity: 1 !important;
+      cursor: not-allowed !important;
+      background: #a6a6c8 !important;
+      color: #e0e0e0 !important;
+      box-shadow: none !important;
+      font-weight: 500;
+    }
+    .unauth-box {
       background-color: #f8f9fa;
       border: 1px solid #dee2e6;
       border-radius: 8px;
@@ -109,7 +114,8 @@ import { OAuthProvider } from '../../models/config.model';
       box-sizing: border-box;
       text-align: left;
     }
-    .unauth-box {
+    
+    .status-card {
       background-color: #f8f9fa;
       border: 1px solid #dee2e6;
       border-radius: 8px;
@@ -131,30 +137,33 @@ import { OAuthProvider } from '../../models/config.model';
     }
     
     .btn {
-      padding: 10px 20px;
+      padding: 10px 32px;
       border: none;
-      border-radius: 5px;
+      border-radius: 24px;
       cursor: pointer;
-      margin: 0 5px;
+      margin: 0 8px;
       font-size: 16px;
+      background: linear-gradient(90deg, #7b7fd7 0%, #8e8edc 100%);
+      color: #fff;
+      font-weight: 500;
+      transition: background 0.2s, color 0.2s, opacity 0.2s;
+      box-shadow: none;
     }
     
     .btn-primary {
       background-color: #007bff;
-      color: white;
+  /* color: white; */
     }
-        .auth-info {
-          text-align: left;
-          margin-bottom: 20px;
-          margin-left: -20px;
-          padding: 20px;
-          border: 1px solid #dee2e6;
-          border-radius: 8px;
-          background-color: #f8f9fa;
-          width: calc(100% + 40px);
-          box-sizing: border-box;
-        }
-      color: white;
+    .auth-info {
+      text-align: left;
+      margin-bottom: 20px;
+      margin-left: -20px;
+      padding: 20px;
+      border: 1px solid #dee2e6;
+      border-radius: 8px;
+      background-color: #f8f9fa;
+      width: calc(100% + 40px);
+      box-sizing: border-box;
     }
     
     .btn-danger {
@@ -162,13 +171,28 @@ import { OAuthProvider } from '../../models/config.model';
       color: white;
     }
     
-    .btn:hover:not(:disabled) {
-      opacity: 0.9;
+    .btn-secondary {
+      background-color: #6c757d;
+      color: white;
     }
     
-    .btn:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
+    button.btn[disabled],
+    button.btn:disabled,
+    .btn[disabled],
+    .btn:disabled,
+    .btn-primary[disabled],
+    .btn-primary:disabled,
+    .btn-secondary[disabled],
+    .btn-secondary:disabled,
+    .btn-danger[disabled],
+    .btn-danger:disabled {
+      opacity: 0.6 !important;
+      cursor: not-allowed !important;
+      background: #c0c0c0 !important;
+      color: #888 !important;
+      box-shadow: none !important;
+      font-weight: 500 !important;
+      pointer-events: none !important;
     }
     
     .error-message {
@@ -342,10 +366,18 @@ export class AuthComponent {
     
     if (provider === 'keycloak') {
       const config = this.configService.getKeycloakConfig();
-      return config !== null && !!config.issuer && !!config.clientId;
+      return config !== null && 
+             !!config.issuer && 
+             !!config.clientId && 
+             !config.clientId.includes('<') && 
+             !config.clientId.includes('>');
     } else if (provider === 'entra') {
       const config = this.configService.getEntraConfig();
-      return config !== null && !!config.tenantId && !!config.clientId;
+      return config !== null && 
+             !!config.tenantId && 
+             !!config.clientId && 
+             !config.clientId.includes('<') && 
+             !config.clientId.includes('>');
     }
     
     return false;

@@ -2,6 +2,7 @@ import { Component, signal } from '@angular/core';
 import { RouterOutlet, RouterLink, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { AuthService } from './services/auth.service';
+import { ConfigService } from './services/config.service';
 
 @Component({
   selector: 'app-root',
@@ -14,6 +15,7 @@ export class App {
 
   constructor(
     public authService: AuthService,
+    public configService: ConfigService,
     private router: Router
   ) {}
 

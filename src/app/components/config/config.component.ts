@@ -24,7 +24,7 @@ import { KeycloakConfig, EntraConfig, ApiConfig, OAuthProvider } from '../../mod
               <input type="radio" [(ngModel)]="selectedProvider" value="keycloak" name="provider" (change)="onProviderChange()">
               Keycloak
             </label>
-            <label class="radio-label disabled">
+            <label class="radio-label disabled" title="Work in Progress">
               <input type="radio" [(ngModel)]="selectedProvider" value="entra" name="provider" (change)="onProviderChange()">
               Microsoft Entra ID
             </label>
