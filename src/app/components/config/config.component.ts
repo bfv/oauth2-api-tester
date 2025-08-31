@@ -83,6 +83,9 @@ import { KeycloakConfig, EntraConfig, ApiConfig, OAuthProvider } from '../../mod
             <button type="submit" [disabled]="!kcForm.form.valid" class="btn btn-primary">
               Save OAuth Config
             </button>
+              <button type="button" (click)="clearConfig()" class="btn btn-danger">
+                Reset Config
+              </button>
           </form>
         </div>
 
@@ -140,6 +143,9 @@ import { KeycloakConfig, EntraConfig, ApiConfig, OAuthProvider } from '../../mod
             <button type="submit" [disabled]="!entraForm.form.valid" class="btn btn-primary">
               Save OAuth Config
             </button>
+              <button type="button" (click)="clearConfig()" class="btn btn-danger">
+                Reset Config
+              </button>
           </form>
         </div>
 
@@ -201,11 +207,7 @@ import { KeycloakConfig, EntraConfig, ApiConfig, OAuthProvider } from '../../mod
         </form>
       </div>
       
-      <div class="config-section">
-        <h3>Actions</h3>
-        <button (click)="loadDefaults()" class="btn btn-secondary">Load Defaults</button>
-        <button (click)="clearConfig()" class="btn btn-danger">Clear All Config</button>
-      </div>
+
       
       <div *ngIf="message()" class="message" [class]="messageType()">
         {{ message() }}
