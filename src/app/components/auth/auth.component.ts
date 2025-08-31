@@ -14,24 +14,27 @@ import { OAuthProvider } from '../../models/config.model';
       <h2>Authentication</h2>
       
       <div *ngIf="!authService.isAuthenticated()" class="login-section">
+        <div class="auth-info">
+          <p><strong>Authorization Server URL:</strong> {{ getAuthServerUrl() }}</p>
+          <p><strong>Client ID:</strong> {{ getClientId() }}</p>
+        </div>
         <div *ngIf="authService.isProcessing()" class="processing-message">
           <p>🔄 Processing authentication...</p>
           <p>Please wait while we complete the login process.</p>
         </div>
         
         <div *ngIf="!authService.isProcessing()">
-          <p>You are not authenticated. Please log in to continue.</p>
-          
-          <div *ngIf="!hasOAuthConfig()" class="config-warning">
-            <p><strong>⚠️ No OAuth Configuration Found</strong></p>
-            <p>Please configure your {{ getCurrentProviderDisplayName() }} settings first in the Configuration tab.</p>
-            <button routerLink="/config" class="btn btn-secondary">Go to Configuration</button>
+          <div class="unauth-box">
+            <p>You are not authenticated. Please log in to continue.</p>
+            <div *ngIf="!hasOAuthConfig()" class="config-warning">
+              <p><strong>⚠️ No OAuth Configuration Found</strong></p>
+              <p>Please configure your {{ getCurrentProviderDisplayName() }} settings first in the Configuration tab.</p>
+              <button routerLink="/config" class="btn btn-secondary">Go to Configuration</button>
+            </div>
+            <div *ngIf="hasOAuthConfig()">
+              <button (click)="login()" class="btn btn-primary">Login with {{ getCurrentProviderDisplayName() }}</button>
+            </div>
           </div>
-          
-          <div *ngIf="hasOAuthConfig()">
-            <button (click)="login()" class="btn btn-primary">Login with {{ getCurrentProviderDisplayName() }}</button>
-          </div>
-          
           <div *ngIf="authService.errorMessage()" class="error-message">
             <strong>Error:</strong>
             <pre>{{ authService.errorMessage() }}</pre>
@@ -40,6 +43,10 @@ import { OAuthProvider } from '../../models/config.model';
       </div>
       
       <div *ngIf="authService.isAuthenticated()" class="authenticated-section">
+        <div class="auth-info">
+          <p><strong>Authorization Server URL:</strong> {{ getAuthServerUrl() }}</p>
+          <p><strong>Client ID:</strong> {{ getClientId() }}</p>
+        </div>
         <div class="status-card">
           <h3>✅ Authentication Successful</h3>
           <p>You are successfully authenticated with {{ getCurrentProviderDisplayName() }}.</p>
@@ -81,7 +88,7 @@ import { OAuthProvider } from '../../models/config.model';
   `,
   styles: [`
     .auth-container {
-      max-width: 600px;
+      max-width: 800px;
       margin: 0 auto;
       padding: 20px;
     }
@@ -96,7 +103,22 @@ import { OAuthProvider } from '../../models/config.model';
       border: 1px solid #dee2e6;
       border-radius: 8px;
       padding: 20px;
-      margin-bottom: 20px;
+      margin-bottom: 0;
+      margin-left: -20px;
+      width: calc(100% + 40px);
+      box-sizing: border-box;
+      text-align: left;
+    }
+    .unauth-box {
+      background-color: #f8f9fa;
+      border: 1px solid #dee2e6;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 0;
+      margin-left: -20px;
+      width: calc(100% + 40px);
+      box-sizing: border-box;
+      text-align: left;
     }
     
     .status-card h3 {
@@ -121,9 +143,17 @@ import { OAuthProvider } from '../../models/config.model';
       background-color: #007bff;
       color: white;
     }
-    
-    .btn-secondary {
-      background-color: #6c757d;
+        .auth-info {
+          text-align: left;
+          margin-bottom: 20px;
+          margin-left: -20px;
+          padding: 20px;
+          border: 1px solid #dee2e6;
+          border-radius: 8px;
+          background-color: #f8f9fa;
+          width: calc(100% + 40px);
+          box-sizing: border-box;
+        }
       color: white;
     }
     
@@ -188,11 +218,13 @@ import { OAuthProvider } from '../../models/config.model';
     }
     
     .debug-section {
-      margin-top: 30px;
+      margin-top: 0px;
       padding: 20px;
       background-color: #f8f9fa;
       border: 1px solid #dee2e6;
       border-radius: 8px;
+      width: 100%;
+      box-sizing: border-box;
     }
     
     .debug-section h3 {
@@ -271,6 +303,30 @@ export class AuthComponent {
     public authService: AuthService,
     private configService: ConfigService
   ) {}
+
+  getAuthServerUrl(): string {
+    const provider = this.configService.getCurrentProvider();
+    if (provider === 'keycloak') {
+      const config = this.configService.getKeycloakConfig();
+      return config?.issuer || '(not set)';
+    } else if (provider === 'entra') {
+      const config = this.configService.getEntraConfig();
+      return config?.authority || (config?.tenantId ? `https://login.microsoftonline.com/${config.tenantId}` : '(not set)');
+    }
+    return '(not set)';
+  }
+
+  getClientId(): string {
+    const provider = this.configService.getCurrentProvider();
+    if (provider === 'keycloak') {
+      const config = this.configService.getKeycloakConfig();
+      return config?.clientId || '(not set)';
+    } else if (provider === 'entra') {
+      const config = this.configService.getEntraConfig();
+      return config?.clientId || '(not set)';
+    }
+    return '(not set)';
+  }
 
   getCurrentProvider(): OAuthProvider {
     return this.configService.getCurrentProvider();
