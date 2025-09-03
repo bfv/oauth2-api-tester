@@ -58,6 +58,34 @@ npm run docker:run
 
 For detailed Docker instructions, see [DOCKER.md](./DOCKER.md).
 
+## CI/CD with GitHub Actions
+
+This project includes a GitHub Actions workflow that automatically builds and pushes Docker images to Docker Hub when tags starting with "v" are pushed to the repository.
+
+### Setup Required
+
+1. Configure GitHub secrets as described in [GITHUB-SETUP.md](./GITHUB-SETUP.md) (only Docker Hub credentials needed)
+2. Push a version tag to trigger the build:
+   ```bash
+   git tag v1.0.0
+   git push origin v1.0.0
+   ```
+
+The workflow builds a lightweight Docker image that serves HTTP on port 80. SSL/TLS should be handled at deployment time using reverse proxies or cloud load balancers for security and flexibility.
+
+### Deployment
+
+For production deployment with SSL/TLS, see [DEPLOYMENT.md](./DEPLOYMENT.md) for various deployment strategies including reverse proxies, cloud load balancers, and Kubernetes ingress.
+
+### certificates
+There's an cert/key for locahost, so scenarios like http://localhost:4200 should possible.
+For custom certs:
+```
+    volumes:
+      # Mount SSL certificates if using HTTPS
+      - ./cert.pem:/etc/ssl/certs/cert.pem:ro
+      - ./key.pem:/etc/ssl/certs/key.pem:ro
+```
 ## Usage
 
 ### 1. Configuration

@@ -45,3 +45,6 @@ docker-compose*.yml
 *.md
 .editorconfig
 .browserslistrc
+
+# GitHub workflows and configs
+.github

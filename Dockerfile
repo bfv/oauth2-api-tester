@@ -1,6 +1,9 @@
 # Multi-stage build for Angular application
 FROM node:20-alpine AS builder
 
+# Build argument for the tag
+ARG BUILD_TAG=dev
+
 # Set working directory
 WORKDIR /app
 
@@ -13,7 +16,11 @@ RUN npm ci && npm cache clean --force
 # Copy source code
 COPY . .
 
-# Build the application
+# Replace the placeholder version in the production environment file
+RUN sed -i "s/PLACEHOLDER_VERSION/${BUILD_TAG}/g" src/environments/environment.prod.ts
+
+# Build the application with the tag as an environment variable
+ENV NG_APP_VERSION=$BUILD_TAG
 RUN npm run build
 
 # Production stage
