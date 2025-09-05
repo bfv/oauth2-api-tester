@@ -1,6 +1,7 @@
 import { Component, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
+import { Router } from '@angular/router';
 import { ConfigService } from '../../services/config.service';
 import { AuthService } from '../../services/auth.service';
 import { KeycloakConfig, EntraConfig, ApiConfig, OAuthProvider } from '../../models/config.model';
@@ -393,7 +394,8 @@ export class ConfigComponent {
 
   constructor(
     private configService: ConfigService,
-    private authService: AuthService
+    private authService: AuthService,
+    private router: Router
   ) {
     this.loadCurrentConfig();
   }
@@ -492,9 +494,19 @@ export class ConfigComponent {
   }
 
   clearConfig(): void {
+    // First logout from the auth server if authenticated
+    if (this.authService.isAuthenticated()) {
+      this.authService.logout();
+    }
+    
+    // Clear the configuration
     this.configService.clearConfig();
     this.loadCurrentConfig();
-    this.showMessage('Configuration cleared', 'success');
+    
+    // Navigate to config page to ensure user is on the right page
+    this.router.navigate(['/config']);
+    
+    this.showMessage('Configuration cleared and logged out - navigation disabled except for configuration', 'success');
   }
 
   exportKeycloakConfig(): void {
