@@ -4,7 +4,7 @@ import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { ConfigService } from '../../services/config.service';
 import { AuthService } from '../../services/auth.service';
-import { KeycloakConfig, EntraConfig, ApiConfig, OAuthProvider } from '../../models/config.model';
+import { KeycloakConfig, EntraConfig, ApiConfig, OAuthProvider, PKCEMethod } from '../../models/config.model';
 
 @Component({
   selector: 'app-config',
@@ -79,6 +79,23 @@ import { KeycloakConfig, EntraConfig, ApiConfig, OAuthProvider } from '../../mod
                 name="scope"
                 [(ngModel)]="keycloakConfig.scope" 
                 placeholder="openid profile email">
+            </div>
+            
+            <div class="form-group">
+              <label for="pkce">PKCE (Proof Key for Code Exchange):</label>
+              <select 
+                id="pkce" 
+                name="pkce"
+                [(ngModel)]="keycloakConfig.pkce" 
+                class="form-select">
+                <option value="none">None (Traditional OAuth2)</option>
+                <option value="S256">S256 (SHA256 - Recommended for Security)</option>
+              </select>
+              <small class="help-text">
+                <strong>PKCE adds extra security to OAuth2 flows:</strong><br>
+                • <strong>None:</strong> Uses traditional OAuth2 flow without PKCE<br>
+                • <strong>S256:</strong> Uses SHA256-based PKCE for enhanced security (recommended for public clients)
+              </small>
             </div>
             
             <button type="submit" [disabled]="!kcForm.form.valid" class="btn btn-primary">
@@ -163,6 +180,24 @@ import { KeycloakConfig, EntraConfig, ApiConfig, OAuthProvider } from '../../mod
             <small>💡 Export creates a JSON file with your configuration. Import automatically loads and saves the configuration locally. Modern browsers (Chrome/Edge) will show a save dialog for export, others will prompt for filename.</small>
           </div>
         </div>
+
+        <!-- Troubleshooting Section -->
+        <div class="troubleshooting-section">
+          <h4>🔧 Troubleshooting</h4>
+          <button type="button" (click)="debugConfiguration()" class="btn btn-secondary btn-sm">
+            Show Debug Info
+          </button>
+          <button type="button" (click)="clearAuthState()" class="btn btn-secondary btn-sm">
+            Clear Auth State
+          </button>
+          <button type="button" (click)="fixRedirectUri()" class="btn btn-warning btn-sm">
+            Fix Redirect URI
+          </button>
+          <div class="help-text" *ngIf="debugInfo">
+            <small><strong>Current Configuration:</strong></small>
+            <pre class="debug-output">{{ debugInfo | json }}</pre>
+          </div>
+        </div>
       </div>
       
       <div class="config-section">
@@ -240,12 +275,17 @@ import { KeycloakConfig, EntraConfig, ApiConfig, OAuthProvider } from '../../mod
       font-weight: bold;
     }
     
-    input[type="text"] {
+    input[type="text"], .form-select {
       width: 100%;
       padding: 8px;
       border: 1px solid #ccc;
       border-radius: 3px;
       box-sizing: border-box;
+    }
+    
+    .form-select {
+      background-color: white;
+      cursor: pointer;
     }
     
     .endpoints-section {
@@ -288,6 +328,11 @@ import { KeycloakConfig, EntraConfig, ApiConfig, OAuthProvider } from '../../mod
     .btn-danger {
       background-color: #dc3545;
       color: white;
+    }
+
+    .btn-warning {
+      background-color: #ffc107;
+      color: #212529;
     }
     
     .btn-sm {
@@ -378,6 +423,24 @@ import { KeycloakConfig, EntraConfig, ApiConfig, OAuthProvider } from '../../mod
       color: #721c24;
       border: 1px solid #f1aeb5;
     }
+
+    .troubleshooting-section {
+      margin-top: 20px;
+      padding-top: 15px;
+      border-top: 1px solid #ddd;
+    }
+
+    .debug-output {
+      background-color: #f8f9fa;
+      border: 1px solid #dee2e6;
+      border-radius: 3px;
+      padding: 10px;
+      font-size: 12px;
+      max-height: 300px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      margin-top: 10px;
+    }
   `]
 })
 export class ConfigComponent {
@@ -391,6 +454,7 @@ export class ConfigComponent {
   
   message = signal('');
   messageType = signal('success');
+  debugInfo: any = null;
 
   constructor(
     private configService: ConfigService,
@@ -409,6 +473,11 @@ export class ConfigComponent {
     
     // Load configurations
     this.keycloakConfig = this.configService.getKeycloakConfig() || this.configService.getDefaultKeycloakConfig();
+    
+    // Ensure PKCE field exists (backward compatibility)
+    if (!this.keycloakConfig.pkce) {
+      this.keycloakConfig.pkce = 'none';
+    }
     this.entraConfig = this.configService.getEntraConfig() || this.configService.getDefaultEntraConfig();
     this.apiConfig = savedConfig?.api || this.configService.getDefaultApiConfig();
     
@@ -642,7 +711,8 @@ export class ConfigComponent {
             issuer: importedConfig.keycloak.issuer,
             clientId: importedConfig.keycloak.clientId,
             redirectUri: importedConfig.keycloak.redirectUri || '',
-            scope: importedConfig.keycloak.scope || 'openid profile email'
+            scope: importedConfig.keycloak.scope || 'openid profile email',
+            pkce: importedConfig.keycloak.pkce || 'none'
           };
           
           // Save the imported Keycloak config
@@ -665,7 +735,8 @@ export class ConfigComponent {
               issuer: oauthConfig.keycloak.issuer || '',
               clientId: oauthConfig.keycloak.clientId || '',
               redirectUri: oauthConfig.keycloak.redirectUri || '',
-              scope: oauthConfig.keycloak.scope || 'openid profile email'
+              scope: oauthConfig.keycloak.scope || 'openid profile email',
+              pkce: oauthConfig.keycloak.pkce || 'none'
             };
             this.configService.saveKeycloakConfig(this.keycloakConfig);
           }
@@ -687,7 +758,8 @@ export class ConfigComponent {
               issuer: oauthConfig.keycloak.issuer || '',
               clientId: oauthConfig.keycloak.clientId || '',
               redirectUri: oauthConfig.keycloak.redirectUri || '',
-              scope: oauthConfig.keycloak.scope || 'openid profile email'
+              scope: oauthConfig.keycloak.scope || 'openid profile email',
+              pkce: oauthConfig.keycloak.pkce || 'none'
             };
           }
           
@@ -738,5 +810,105 @@ export class ConfigComponent {
     setTimeout(() => {
       this.message.set('');
     }, 3000);
+  }
+
+  async debugConfiguration(): Promise<void> {
+    this.debugInfo = this.authService.debugOAuthConfiguration();
+    
+    // Add specific redirect URI validation
+    const currentProvider = this.selectedProvider;
+    if (currentProvider === 'keycloak' && this.keycloakConfig) {
+      const redirectUri = this.keycloakConfig.redirectUri || (window.location.origin + '/auth');
+      
+      // Test the redirect URI
+      const testResult = await this.authService.testRedirectUri(this.keycloakConfig);
+      
+      this.debugInfo.redirectUriAnalysis = {
+        configured: this.keycloakConfig.redirectUri,
+        effective: redirectUri,
+        isCustom: !!this.keycloakConfig.redirectUri,
+        isValid: this.validateRedirectUri(redirectUri),
+        testResult: testResult,
+        suggestions: [
+          ...this.getRedirectUriSuggestions(redirectUri),
+          ...testResult.suggestions || []
+        ]
+      };
+    }
+    
+    this.showMessage('Debug information displayed below. Check console for detailed logs.', 'success');
+  }
+
+  private validateRedirectUri(uri: string): boolean {
+    try {
+      const url = new URL(uri);
+      return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  }
+
+  private getRedirectUriSuggestions(uri: string): string[] {
+    const suggestions: string[] = [];
+    
+    try {
+      const url = new URL(uri);
+      
+      if (url.protocol === 'http:' && url.hostname !== 'localhost') {
+        suggestions.push('Consider using HTTPS for production environments');
+      }
+      
+      if (!url.pathname.includes('/auth')) {
+        suggestions.push('Make sure Keycloak client has this exact redirect URI configured');
+        suggestions.push('Common format: http://localhost:4200/auth or https://yourdomain.com/auth');
+      }
+      
+      if (url.port && url.port !== '80' && url.port !== '443') {
+        suggestions.push(`Ensure port ${url.port} is included in Keycloak client configuration`);
+      }
+      
+    } catch {
+      suggestions.push('Invalid URL format');
+      suggestions.push('Use format: http://localhost:4200/auth or https://yourdomain.com/auth');
+    }
+    
+    return suggestions;
+  }
+
+  clearAuthState(): void {
+    this.authService.clearPkceError();
+    this.debugInfo = null;
+    this.showMessage('Authentication state cleared successfully.', 'success');
+  }
+
+  fixRedirectUri(): void {
+    if (this.selectedProvider === 'keycloak' && this.keycloakConfig) {
+      // Common fixes for redirect URI issues
+      const currentOrigin = window.location.origin;
+      const commonRedirectUris = [
+        `${currentOrigin}/auth`,
+        `${currentOrigin}/oauth-callback`,
+        `${currentOrigin}/callback`,
+        `${currentOrigin}/`
+      ];
+
+      const message = `Common redirect URI formats for your current origin (${currentOrigin}):\n\n` +
+        commonRedirectUris.map((uri, index) => `${index + 1}. ${uri}`).join('\n') +
+        `\n\nIn Keycloak Admin Console:\n` +
+        `1. Go to your client configuration\n` +
+        `2. Add one of these URLs to "Valid Redirect URIs"\n` +
+        `3. Use wildcards if needed: ${currentOrigin}/*\n` +
+        `4. Save the client configuration\n` +
+        `5. Make sure "Standard Flow Enabled" is ON\n` +
+        `6. If using PKCE, ensure "Proof Key for Code Exchange Code Challenge Method" is set to S256`;
+
+      alert(message);
+      
+      // Auto-suggest the most common one
+      if (!this.keycloakConfig.redirectUri || !this.keycloakConfig.redirectUri.includes('/auth')) {
+        this.keycloakConfig.redirectUri = `${currentOrigin}/auth`;
+        this.showMessage(`Updated redirect URI to: ${this.keycloakConfig.redirectUri}. Please save the configuration.`, 'success');
+      }
+    }
   }
 }

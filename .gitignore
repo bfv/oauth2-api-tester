@@ -40,3 +40,8 @@ testem.log
 # System files
 .DS_Store
 Thumbs.db
+
+# SSL certificates (should be handled at deployment)
+*.pem
+cert.pem
+key.pem

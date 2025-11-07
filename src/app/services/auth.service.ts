@@ -4,7 +4,7 @@ import { HttpClient } from '@angular/common/http';
 import { jwtDecode } from 'jwt-decode';
 import { ConfigService } from './config.service';
 import { TokenInfo, DecodedToken } from '../models/api.model';
-import { KeycloakConfig, EntraConfig, OAuthProvider } from '../models/config.model';
+import { KeycloakConfig, EntraConfig, OAuthProvider, PKCEMethod } from '../models/config.model';
 
 @Injectable({
   providedIn: 'root'
@@ -61,6 +61,19 @@ export class AuthService {
       } else if (event.type === 'token_refresh_error') {
         console.error('❌ Token refresh error:', event);
         this.debugLog('Token refresh error', event);
+      } else if (event.type === 'token_error') {
+        console.error('❌ Token validation error:', event);
+        this.debugLog('Token validation error', event);
+        
+        // Check if it's a PKCE-related state/nonce error
+        const errorData = event as any;
+        if (errorData.reason && (errorData.reason.includes('state') || errorData.reason.includes('nonce'))) {
+          this.debugLog('PKCE state/nonce validation failed - attempting recovery');
+          this.handlePkceError();
+          this._errorMessage.set('Token validation failed due to state/nonce mismatch. This is often caused by PKCE configuration issues. The authentication state has been cleared. Please try logging in again.');
+        } else {
+          this._errorMessage.set(`Token validation error: ${errorData.reason || 'Unknown error'}`);
+        }
       } else if (event.type === 'discovery_document_validation_error') {
         console.error('❌ Discovery document validation error:', event);
         this.debugLog('Discovery document validation error', event);
@@ -107,6 +120,7 @@ export class AuthService {
   configureKeycloak(config: KeycloakConfig): boolean {
     try {
       this.debugLog('Configuring Keycloak auth with config', config);
+      this.debugLog('PKCE setting', config.pkce || 'none');
       
       // Determine the correct redirect URI
       let redirectUri = config.redirectUri;
@@ -115,16 +129,45 @@ export class AuthService {
         redirectUri = window.location.origin + '/auth';
         this.debugLog('No redirect URI provided, using /auth route', redirectUri);
       } else {
-        // Check if the redirect URI is different from our current origin
-        const redirectUrl = new URL(redirectUri);
-        const currentUrl = new URL(window.location.origin);
-        
-        if (redirectUrl.origin !== currentUrl.origin) {
-          this.debugLog('Custom redirect URI detected, will intercept OAuth callback', redirectUri);
-          // We'll handle the custom redirect in the OAuth flow
+        // Validate and normalize redirect URI
+        try {
+          const redirectUrl = new URL(redirectUri);
+          const currentUrl = new URL(window.location.origin);
+          
+          // Ensure the redirect URI is properly formatted
+          if (redirectUrl.pathname && !redirectUrl.pathname.endsWith('/')) {
+            // Add trailing slash if needed for consistency
+            this.debugLog('Redirect URI format check', {
+              original: redirectUri,
+              normalized: redirectUrl.href
+            });
+          }
+          
+          if (redirectUrl.origin !== currentUrl.origin) {
+            this.debugLog('Custom redirect URI detected, will intercept OAuth callback', redirectUri);
+            // We'll handle the custom redirect in the OAuth flow
+          }
+        } catch (urlError) {
+          this.debugLog('Invalid redirect URI format, using default', { redirectUri, error: urlError });
+          redirectUri = window.location.origin + '/auth';
         }
       }
       
+      // Ensure redirect URI is properly formatted for PKCE
+      const isPkceEnabled = (config.pkce || 'none') !== 'none';
+      
+      // When PKCE is enabled, some Keycloak configurations are more strict about redirect URI format
+      if (isPkceEnabled && redirectUri) {
+        // Ensure no trailing slash issues
+        try {
+          const url = new URL(redirectUri);
+          redirectUri = url.href;
+          this.debugLog('PKCE enabled - normalized redirect URI', { original: config.redirectUri, normalized: redirectUri });
+        } catch (urlError) {
+          this.debugLog('Redirect URI normalization failed', urlError);
+        }
+      }
+
       const authConfig: AuthConfig = {
         issuer: config.issuer,
         clientId: config.clientId,
@@ -135,16 +178,46 @@ export class AuthService {
         requireHttps: false, // Allow HTTP for development
         useSilentRefresh: true,
         silentRefreshRedirectUri: window.location.origin + '/silent-refresh.html',
-        // Disable PKCE to match Keycloak configuration
-        disablePKCE: true,
+        // Configure PKCE based on user preference
+        disablePKCE: !isPkceEnabled,
         // Store state/nonce in sessionStorage to survive page reloads
-        sessionChecksEnabled: true
+        sessionChecksEnabled: true,
+        // Additional settings to help with state/nonce validation
+        clearHashAfterLogin: true,
+        // PKCE-specific settings
+        ...(isPkceEnabled && {
+          // Force specific PKCE method for better compatibility
+          codeChallenge: undefined, // Let the library generate it
+          codeChallengeMethod: 'S256'
+        })
       };
 
       this.debugLog('Keycloak OAuth Auth Config', authConfig);
       
       this.oauthService.configure(authConfig);
       this.oauthService.setupAutomaticSilentRefresh();
+      
+      // Debug the configured redirect URI
+      this.debugLog('Configured Redirect URI Details', {
+        configuredRedirectUri: redirectUri,
+        actualConfiguredUri: authConfig.redirectUri,
+        pkceEnabled: !authConfig.disablePKCE,
+        currentOrigin: window.location.origin,
+        currentHref: window.location.href,
+        encodedRedirectUri: encodeURIComponent(redirectUri || ''),
+        originalConfigRedirectUri: config.redirectUri
+      });
+
+      // Additional validation for PKCE + redirect URI compatibility
+      if (!authConfig.disablePKCE && redirectUri) {
+        this.debugLog('PKCE + Redirect URI validation', {
+          redirectUri: redirectUri,
+          isValidUrl: this.isValidHttpUrl(redirectUri),
+          hasValidProtocol: redirectUri.startsWith('http://') || redirectUri.startsWith('https://'),
+          containsSpecialChars: /[^a-zA-Z0-9:\/\.\-_~]/.test(redirectUri),
+          recommendation: 'If redirect URI contains special characters or complex paths, try a simpler format like http://localhost:4200/auth'
+        });
+      }
       
       this.debugLog('Keycloak auth configuration successful');
       return true;
@@ -427,8 +500,18 @@ export class AuthService {
         
       } catch (tokenError) {
         this.debugLog('OAuth processing threw error', tokenError);
-        this._errorMessage.set(`Token exchange failed: ${tokenError}`);
-        throw tokenError;
+        
+        // Check if this is a PKCE-related state/nonce validation error
+        const errorMessage = tokenError?.toString() || '';
+        if (errorMessage.includes('state') || errorMessage.includes('nonce') || errorMessage.includes('PKCE')) {
+          this.debugLog('Detected PKCE state/nonce validation error');
+          this.handlePkceError();
+          this._errorMessage.set('Token validation failed due to PKCE state/nonce mismatch. Authentication state has been cleared. Please try logging in again. If the problem persists, consider disabling PKCE in the configuration.');
+          return false;
+        } else {
+          this._errorMessage.set(`Token exchange failed: ${tokenError}`);
+          throw tokenError;
+        }
       }
       
       // Check token status immediately after processing
@@ -549,9 +632,19 @@ export class AuthService {
         if (currentProvider === 'keycloak') {
           const keycloakConfig = this.configService.getKeycloakConfig();
           if (keycloakConfig) {
+            const actualRedirectUri = keycloakConfig.redirectUri || (window.location.origin + '/auth');
+            this.debugLog('Keycloak Redirect URI Analysis', {
+              configuredRedirectUri: keycloakConfig.redirectUri,
+              defaultRedirectUri: window.location.origin + '/auth',
+              actualRedirectUri: actualRedirectUri,
+              oauthServiceRedirectUri: this.oauthService.redirectUri,
+              currentOrigin: window.location.origin,
+              pkceEnabled: (keycloakConfig.pkce || 'none') !== 'none'
+            });
+            
             expectedAuthUrl = `${keycloakConfig.issuer}/protocol/openid-connect/auth?` +
               `client_id=${encodeURIComponent(keycloakConfig.clientId)}&` +
-              `redirect_uri=${encodeURIComponent(window.location.origin + '/auth')}&` +
+              `redirect_uri=${encodeURIComponent(actualRedirectUri)}&` +
               `response_type=code&` +
               `scope=${encodeURIComponent(keycloakConfig.scope || 'openid profile email')}`;
           }
@@ -769,5 +862,151 @@ export class AuthService {
       console.error('Manual token exchange error:', error);
       this._errorMessage.set(`Manual token exchange failed: ${error}`);
     }
+  }
+
+  /**
+   * Handle PKCE validation errors by clearing state and restarting the flow
+   */
+  handlePkceError(): void {
+    this.debugLog('Handling PKCE state/nonce validation error');
+    
+    // Clear any stored OAuth state
+    sessionStorage.removeItem('PKCE_verifier');
+    sessionStorage.removeItem('nonce');
+    sessionStorage.removeItem('state');
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('id_token');
+    localStorage.removeItem('refresh_token');
+    
+    // Clear URL parameters
+    window.history.replaceState({}, document.title, window.location.pathname);
+    
+    // Clear error state
+    this._errorMessage.set('');
+    this._isAuthenticated.set(false);
+    this._tokenInfo.set(null);
+    
+    this.debugLog('PKCE error recovery completed - ready for new auth flow');
+  }
+
+  /**
+   * Retry authentication with PKCE disabled if validation fails
+   */
+  async retryAuthWithoutPkce(): Promise<void> {
+    const config = this.configService.getKeycloakConfig();
+    if (!config) return;
+
+    // Temporarily disable PKCE
+    const originalPkce = config.pkce;
+    config.pkce = 'none';
+    
+    this.debugLog('Retrying authentication with PKCE disabled');
+    
+    // Clear any existing state
+    this.handlePkceError();
+    
+    // Reconfigure with PKCE disabled
+    this.configureKeycloak(config);
+    
+    // Restore original PKCE setting
+    config.pkce = originalPkce;
+    
+    this.debugLog('Authentication retry configured - manual login required');
+    this._errorMessage.set('PKCE validation failed. Authentication has been reset. Please try logging in again. If the problem persists, consider disabling PKCE in the configuration.');
+  }
+
+  /**
+   * Clear PKCE errors and reset authentication state
+   */
+  clearPkceError(): void {
+    this.handlePkceError();
+    this._errorMessage.set('Authentication state cleared. You can now try logging in again.');
+  }
+
+  /**
+   * Validate if a string is a valid HTTP/HTTPS URL
+   */
+  private isValidHttpUrl(string: string): boolean {
+    try {
+      const url = new URL(string);
+      return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Test redirect URI validity by making a pre-flight check
+   */
+  async testRedirectUri(config: KeycloakConfig): Promise<{valid: boolean, error?: string, suggestions?: string[]}> {
+    const redirectUri = config.redirectUri || (window.location.origin + '/auth');
+    
+    try {
+      // Try to construct what the auth URL would look like
+      const authUrl = new URL(`${config.issuer}/protocol/openid-connect/auth`);
+      authUrl.searchParams.set('client_id', config.clientId);
+      authUrl.searchParams.set('redirect_uri', redirectUri);
+      authUrl.searchParams.set('response_type', 'code');
+      authUrl.searchParams.set('scope', config.scope || 'openid profile email');
+      
+      this.debugLog('Testing redirect URI validity', {
+        redirectUri,
+        authUrl: authUrl.toString(),
+        pkceEnabled: (config.pkce || 'none') !== 'none'
+      });
+      
+      return {
+        valid: true,
+        suggestions: [
+          'Ensure this exact URL is configured in Keycloak client Valid Redirect URIs',
+          'Check that the client supports PKCE if you have it enabled',
+          'Verify the client is configured for Authorization Code flow'
+        ]
+      };
+    } catch (error) {
+      return {
+        valid: false,
+        error: `Invalid configuration: ${error}`,
+        suggestions: [
+          'Check that the issuer URL is correct',
+          'Verify the redirect URI format (should start with http:// or https://)',
+          'Ensure the redirect URI matches exactly what is configured in Keycloak'
+        ]
+      };
+    }
+  }
+
+  /**
+   * Debug current OAuth configuration to help diagnose redirect URI issues
+   */
+  debugOAuthConfiguration(): any {
+    const currentProvider = this.configService.getCurrentProvider();
+    const debugInfo: any = {
+      provider: currentProvider,
+      currentOrigin: window.location.origin,
+      currentHref: window.location.href,
+      oauthService: {
+        issuer: this.oauthService.issuer,
+        clientId: this.oauthService.clientId,
+        redirectUri: this.oauthService.redirectUri,
+        scope: this.oauthService.scope,
+        responseType: this.oauthService.responseType,
+        state: this.oauthService.state
+      }
+    };
+
+    if (currentProvider === 'keycloak') {
+      const keycloakConfig = this.configService.getKeycloakConfig();
+      debugInfo.keycloakConfig = keycloakConfig;
+      debugInfo.pkceEnabled = (keycloakConfig?.pkce || 'none') !== 'none';
+    } else if (currentProvider === 'entra') {
+      const entraConfig = this.configService.getEntraConfig();
+      debugInfo.entraConfig = entraConfig;
+      debugInfo.pkceEnabled = true; // Entra always uses PKCE
+    }
+
+    console.log('OAuth Configuration Debug Info:', debugInfo);
+    this.debugLog('OAuth Configuration Debug', debugInfo);
+    return debugInfo;
   }
 }

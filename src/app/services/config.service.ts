@@ -98,7 +98,8 @@ export class ConfigService {
       issuer: 'https://keycloak.bfv.io:8443/realms/<realm>',
       clientId: '<client-id>',
       redirectUri: window.location.origin + '/auth',
-      scope: 'openid profile email'
+      scope: 'openid profile email',
+      pkce: 'none'
     };
   }
 

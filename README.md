@@ -77,15 +77,6 @@ The workflow builds a lightweight Docker image that serves HTTP on port 80. SSL/
 
 For production deployment with SSL/TLS, see [DEPLOYMENT.md](./DEPLOYMENT.md) for various deployment strategies including reverse proxies, cloud load balancers, and Kubernetes ingress.
 
-### certificates
-There's an cert/key for locahost, so scenarios like http://localhost:4200 should possible.
-For custom certs:
-```
-    volumes:
-      # Mount SSL certificates if using HTTPS
-      - ./cert.pem:/etc/ssl/certs/cert.pem:ro
-      - ./key.pem:/etc/ssl/certs/key.pem:ro
-```
 ## Usage
 
 ### 1. Configuration

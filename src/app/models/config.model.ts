@@ -1,10 +1,12 @@
 export type OAuthProvider = 'keycloak' | 'entra';
+export type PKCEMethod = 'none' | 'S256';
 
 export interface KeycloakConfig {
   issuer: string;
   clientId: string;
   redirectUri?: string;
   scope?: string;
+  pkce?: PKCEMethod;
 }
 
 export interface EntraConfig {
